@@ -27,7 +27,5 @@ export function computeIshaIqama(ishaAzan: Dayjs): string {
     gap = 15 - 10 * (minutesSince2000 / 150);
   }
 
-  return formatHHmm(
-    ceilingToNearest5(ishaAzan.add(Math.round(gap * 60), 'second')),
-  );
+  return formatHHmm(ceilingToNearest5(ishaAzan.add(Math.round(gap), 'minute')));
 }
