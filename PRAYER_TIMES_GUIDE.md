@@ -21,16 +21,16 @@ The system calculates both times for the five daily prayers:
 
 ## Azan Calculation
 
-### Method: ISNA (Islamic Society of North America) - Modified
+### Method: ISNA (Islamic Society of North America)
 
-All Azan times are calculated using the **ISNA method** with custom parameters:
+All Azan times are calculated using the **ISNA method** with the following parameters:
 
 - **Location**: Masjid al-Hidayah, Port Coquitlam, BC, Canada
   - Address: 2626 Kingsway Ave, Port Coquitlam, BC V3C 1T5
   - Latitude: 49.2652047°N
   - Longitude: 122.7878735°W
 - **Calculation Parameters**:
-  - Fajr angle: **12.3°** (custom, more conservative than ISNA's 15°)
+  - Fajr angle: 15° (ISNA standard)
   - Isha angle: 15° (ISNA standard)
   - Madhab: Shafi'i (for Asr calculation)
 
