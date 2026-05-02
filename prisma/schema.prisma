@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Override {
+  id           Int      @id @default(autoincrement())
+  prayer       String   // "fajr" | "dhuhr" | "asr" | "maghrib" | "isha"
+  overrideType String   // "FIXED" | "OFFSET"
+  value        String   // HH:mm for FIXED, integer minutes as string for OFFSET
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
