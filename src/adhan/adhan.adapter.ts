@@ -35,6 +35,9 @@ export class AdhanAdapter {
     const coordinates = new Coordinates(this.latitude, this.longitude);
 
     const params = CalculationMethod.NorthAmerica();
+    // Custom Fajr angle (12.3°) to match masjid's calculation
+    // ISNA default is 15°, but local practice uses 12.3°
+    params.fajrAngle = 12.3;
     params.madhab = Madhab.Shafi;
     params.rounding = Rounding.None;
 

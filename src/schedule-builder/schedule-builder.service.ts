@@ -9,6 +9,17 @@ import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
 
+/**
+ * Helper function to convert Gregorian date to Hijri format
+ * Uses dayjs-hijri plugin which adds calendar() method at runtime
+ */
+function toHijriDate(date: Dayjs): string {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const hijriDate: any = (date as any).calendar('hijri');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  return hijriDate.format('MMMM D, YYYY');
+}
+
 @Injectable()
 export class ScheduleBuilderService {
   private readonly timezone: string;
@@ -61,11 +72,16 @@ export class ScheduleBuilderService {
         this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
 
       // (e) Build the DailySchedule object
+      const dateDayjs = dayjs.tz(date, tz);
+      const hijriDate = toHijriDate(dateDayjs);
+
       const schedule: DailySchedule = {
         date,
-        day_of_week: dayjs.tz(date, tz).format('dddd'),
+        hijri_date: hijriDate,
+        day_of_week: dateDayjs.format('dddd'),
         is_dst: isDstActive(date, tz),
         fajr: { azan: formatHHmm(raw.fajr), iqama: finalIqama.fajr },
+        sunrise: formatHHmm(raw.sunrise),
         dhuhr: { azan: formatHHmm(raw.dhuhr), iqama: finalIqama.dhuhr },
         asr: { azan: formatHHmm(raw.asr), iqama: finalIqama.asr },
         maghrib: { azan: formatHHmm(raw.maghrib), iqama: finalIqama.maghrib },
