@@ -2,14 +2,21 @@
 
 A NestJS-based REST API service that calculates Islamic prayer congregation times (Iqama) based on astronomical prayer times (Azan). The service implements custom business rules to transform raw prayer times into practical, community-friendly congregation schedules.
 
+## 📚 Documentation
+
+- **[Prayer Times Calculation Guide](PRAYER_TIMES_GUIDE.md)** - Complete explanation of Azan and Iqama calculations
+- **[Validation Results](VALIDATION.md)** - How to validate prayer times against reference data
+- **[Analysis Results](ANALYSIS_RESULTS.md)** - Detailed accuracy analysis and recommendations
+
 ## Overview
 
 The Iqama Engine takes astronomical prayer times from the `adhan` library and applies sophisticated calculation rules to determine when congregational prayers should begin. These rules balance religious requirements with practical considerations like work schedules, seasonal variations, and community preferences.
 
 ### Key Features
 
-- **Astronomical Calculations**: Uses the `adhan` library for precise prayer time calculations based on geographic coordinates
-- **Custom Business Rules**: Implements five prayer-specific calculation rules (Fajr, Dhuhr, Asr, Maghrib, Isha)
+- **Astronomical Calculations**: Uses the `adhan` library (ISNA method) for precise prayer time calculations
+- **Simplified Asr Rule**: Seasonal fixed times (only 4 changes per year)
+- **Dynamic Fajr Rule**: Protects against sunrise with override support
 - **Admin Overrides**: Allows manual time adjustments for special occasions (Ramadan, holidays, etc.)
 - **RESTful API**: Clean, versioned API endpoints for schedule retrieval and admin management
 
@@ -94,11 +101,13 @@ GET /api/v1/schedule?date=YYYY-MM-DD
 ```
 
 **Example:**
+
 ```bash
 curl "http://localhost:3000/api/v1/schedule?date=2026-05-02"
 ```
 
 **Response:**
+
 ```json
 {
   "date": "2026-05-02",
@@ -132,11 +141,13 @@ GET /api/v1/schedule?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
 ```
 
 **Example:**
+
 ```bash
 curl "http://localhost:3000/api/v1/schedule?start_date=2026-05-01&end_date=2026-05-07"
 ```
 
 **Response:**
+
 ```json
 [
   {
@@ -406,6 +417,7 @@ GET /health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "ok"
@@ -427,6 +439,7 @@ When modifying calculation rules:
 ### Code Style
 
 The project uses:
+
 - **ESLint** for linting
 - **Prettier** for formatting
 - **TypeScript** strict mode
