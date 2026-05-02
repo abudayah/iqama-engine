@@ -1,0 +1,9 @@
+# Build output
+dist/
+node_modules/
+
+# Generated files
+generated/
+
+# Coverage
+coverage/
