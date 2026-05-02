@@ -10,13 +10,13 @@ export class PrismaService
 {
   constructor(configService: ConfigService) {
     const databaseUrl = configService.get<string>('DATABASE_URL');
-    
+
     if (!databaseUrl) {
       throw new Error('DATABASE_URL is not defined');
     }
-    
+
     const url = new URL(databaseUrl);
-    
+
     const adapter = new PrismaMariaDb({
       host: url.hostname,
       port: parseInt(url.port) || 3306,
@@ -25,7 +25,7 @@ export class PrismaService
       database: url.pathname.slice(1), // remove leading /
       connectionLimit: 5,
     });
-    
+
     super({ adapter });
   }
 

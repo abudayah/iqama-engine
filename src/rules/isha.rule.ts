@@ -12,7 +12,7 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
 export function computeIshaIqama(ishaAzan: Dayjs): string {
   // Strip seconds from Azan time for clean minute-based calculations
   const ishaAzanClean = ishaAzan.startOf('minute');
-  
+
   const hour = ishaAzanClean.hour();
   const minute = ishaAzanClean.minute();
   const totalMinutes = hour * 60 + minute;
@@ -32,6 +32,6 @@ export function computeIshaIqama(ishaAzan: Dayjs): string {
 
   const roundedGap = Math.round(gap);
   const result = ceilingToNearest5(ishaAzanClean.add(roundedGap, 'minute'));
-  
+
   return formatHHmm(result);
 }

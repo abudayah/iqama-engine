@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import dayjs from '../dayjs';
 import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
-import { DailySchedule } from '../cache/daily-schedule.interface';
+import { DailySchedule } from './daily-schedule.interface';
 
 @Injectable()
 export class ScheduleService {
@@ -17,7 +17,10 @@ export class ScheduleService {
     return schedule;
   }
 
-  async getScheduleForRange(startDate: string, endDate: string): Promise<DailySchedule[]> {
+  async getScheduleForRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<DailySchedule[]> {
     // Collect all months in the range
     const start = dayjs(startDate);
     const end = dayjs(endDate);

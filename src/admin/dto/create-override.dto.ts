@@ -1,4 +1,4 @@
-import { IsString, IsIn, Matches, IsDateString } from 'class-validator';
+import { IsString, IsIn, IsDateString } from 'class-validator';
 
 export class CreateOverrideDto {
   @IsString()

@@ -14,7 +14,7 @@ export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
   // Strip seconds for clean minute-based calculations
   const fajrAzanClean = fajrAzan.startOf('minute');
   const sunriseClean = sunrise.startOf('minute');
-  
+
   const maxDelay = fajrAzanClean.add(75, 'minute');
   const safeSunriseLimit = sunriseClean.subtract(45, 'minute');
 

@@ -8,7 +8,7 @@ import { computeMaghribIqama } from './maghrib.rule';
 import { computeIshaIqama } from './isha.rule';
 
 export interface IqamaTimes {
-  fajr: string;    // HH:mm
+  fajr: string; // HH:mm
   dhuhr: string;
   asr: string;
   maghrib: string;

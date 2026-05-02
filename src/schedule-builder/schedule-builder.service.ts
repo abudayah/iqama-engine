@@ -7,7 +7,7 @@ import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
-import { DailySchedule } from '../cache/daily-schedule.interface';
+import { DailySchedule } from '../schedule/daily-schedule.interface';
 
 @Injectable()
 export class ScheduleBuilderService {

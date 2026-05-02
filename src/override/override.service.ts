@@ -55,7 +55,9 @@ export class OverrideService {
         const azan = rawAzanTimes[prayer];
         if (azan) {
           const offsetMinutes = parseInt(override.value, 10);
-          result[prayer] = formatHHmm(ceilingToNearest5(azan.add(offsetMinutes, 'minute')));
+          result[prayer] = formatHHmm(
+            ceilingToNearest5(azan.add(offsetMinutes, 'minute')),
+          );
           hasOverrides = true;
         }
       }

@@ -1,1 +1,1 @@
-export type { PrayerEntry, DailySchedule } from '../../cache/daily-schedule.interface';
+export type { PrayerEntry, DailySchedule } from '../daily-schedule.interface';

@@ -1,7 +1,7 @@
 import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { ScheduleQueryDto } from './dto/schedule-query.dto';
-import { DailySchedule } from '../cache/daily-schedule.interface';
+import { DailySchedule } from './daily-schedule.interface';
 
 @Controller('api/v1/schedule')
 export class ScheduleController {
