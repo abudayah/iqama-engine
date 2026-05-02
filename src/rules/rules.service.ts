@@ -26,31 +26,24 @@ export class RulesService {
   /**
    * Compute Iqama times for a given date.
    *
-   * @param date       - YYYY-MM-DD string for the requested date
-   * @param raw        - Raw prayer times for the requested date
-   * @param fridayRaw  - Raw prayer times for the preceding Friday (FR5 Friday Block).
-   *                     When provided, FR3 and FR4 use fridayRaw for Fajr, Asr, and Isha.
-   *                     Maghrib (FR1) and Dhuhr (FR2) always use the requested date's data.
+   * @param date - YYYY-MM-DD string for the requested date
+   * @param raw  - Raw prayer times for the requested date
    */
-  computeIqama(date: string, raw: RawPrayerTimes, fridayRaw?: RawPrayerTimes): IqamaTimes {
-    // Fajr: use fridayRaw if available (Friday Block), else raw
-    const fajrAzan = fridayRaw?.fajr ?? raw.fajr;
-    const sunriseForFajr = fridayRaw?.sunrise ?? raw.sunrise;
-    const fajr = computeFajrIqama(fajrAzan, sunriseForFajr);
+  computeIqama(date: string, raw: RawPrayerTimes): IqamaTimes {
+    // Fajr: use current day's times
+    const fajr = computeFajrIqama(raw.fajr, raw.sunrise);
 
-    // Dhuhr: always use the requested date + timezone (DST toggle, no Friday Block)
+    // Dhuhr: always use the requested date + timezone (DST toggle)
     const dhuhr = computeDhuhrIqama(date, this.timezone);
 
-    // Asr: use fridayRaw if available (Friday Block), else raw
-    const asrAzan = fridayRaw?.asr ?? raw.asr;
-    const asr = computeAsrIqama(asrAzan);
+    // Asr: use current day's times
+    const asr = computeAsrIqama(raw.asr);
 
-    // Maghrib: always use the requested date's own Azan (no Friday Block)
+    // Maghrib: use current day's times
     const maghrib = computeMaghribIqama(raw.maghrib);
 
-    // Isha: use fridayRaw if available (Friday Block), else raw
-    const ishaAzan = fridayRaw?.isha ?? raw.isha;
-    const isha = computeIshaIqama(ishaAzan);
+    // Isha: use current day's times
+    const isha = computeIshaIqama(raw.isha);
 
     return { fajr, dhuhr, asr, maghrib, isha };
   }

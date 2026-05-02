@@ -7,7 +7,6 @@ import dayjs from '../dayjs';
 import { AdhanAdapter, RawPrayerTimes } from '../adhan/adhan.adapter';
 import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
-import { getPrecedingFridayDate } from '../rules/friday-block.rule';
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
 import { DailySchedule } from './daily-schedule.interface';
@@ -45,23 +44,13 @@ export class CacheService {
       const dateObj = new Date(`${date}T12:00:00.000Z`);
       const raw = this.adhanAdapter.getPrayerTimes(dateObj);
 
-      // (b) Determine the preceding Friday date
-      const fridayDate = getPrecedingFridayDate(date, tz);
-
-      // (c) If the preceding Friday is different from the current date, get its raw times
-      let fridayRaw: RawPrayerTimes | undefined = undefined;
-      if (fridayDate !== date) {
-        const fridayDateObj = new Date(`${fridayDate}T12:00:00.000Z`);
-        fridayRaw = this.adhanAdapter.getPrayerTimes(fridayDateObj);
-      }
-
-      // (d) Get overrides for this day
+      // (b) Get overrides for this day
       const overrides = await this.overrideService.getOverridesForDate(date);
 
-      // (e) Compute iqama times via FR1–FR5
-      const iqamaTimes = this.rulesService.computeIqama(date, raw, fridayRaw);
+      // (c) Compute iqama times via FR1–FR4
+      const iqamaTimes = this.rulesService.computeIqama(date, raw);
 
-      // (f) Build rawAzanMap for OFFSET override calculations
+      // (d) Build rawAzanMap for OFFSET override calculations
       const rawAzanMap: Record<string, Dayjs> = {
         fajr: raw.fajr,
         dhuhr: raw.dhuhr,
@@ -74,7 +63,7 @@ export class CacheService {
       const { iqamaTimes: finalIqama, hasOverrides } =
         this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
 
-      // (g) Build the DailySchedule object
+      // (e) Build the DailySchedule object
       const schedule: DailySchedule = {
         date,
         day_of_week: dayjs.tz(date, tz).format('dddd'),

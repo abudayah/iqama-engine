@@ -9,8 +9,6 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
  * Base_Target        = min(Max_Delay, Safe_Sunrise_Limit)
  * if Base_Target < Azan + 10 min: Base_Target = Azan + 10 min
  * Iqama = CeilingToNearest5(Base_Target)
- *
- * When Friday Block is active, fajrAzan and sunrise are from the preceding Friday.
  */
 export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
   const maxDelay = fajrAzan.add(75, 'minute');

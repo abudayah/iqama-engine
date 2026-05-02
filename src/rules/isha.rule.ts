@@ -8,8 +8,6 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
  * if Azan < 20:00:  gap = 15
  * else:             gap = 15 - 10 * (minutesSince20:00) / 150  (linear interpolation)
  * Iqama = CeilingToNearest5(Azan + gap)
- *
- * When Friday Block is active, Azan is from the preceding Friday's Isha time.
  */
 export function computeIshaIqama(ishaAzan: Dayjs): string {
   const hour = ishaAzan.hour();

@@ -10,7 +10,6 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 
 - **Astronomical Calculations**: Uses the `adhan` library for precise prayer time calculations based on geographic coordinates
 - **Custom Business Rules**: Implements five prayer-specific calculation rules (Fajr, Dhuhr, Asr, Maghrib, Isha)
-- **Friday Block Mechanism**: Locks Fajr, Asr, and Isha times to Friday's values for the entire week for consistency
 - **Admin Overrides**: Allows manual time adjustments for special occasions (Ramadan, holidays, etc.)
 - **Intelligent Caching**: Monthly schedule caching with Redis (Upstash) for optimal performance
 - **RESTful API**: Clean, versioned API endpoints for schedule retrieval and admin management
@@ -70,7 +69,6 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 
 - **Azan**: Raw astronomical prayer time calculated by the `adhan` library
 - **Iqama**: Congregation start time (when the prayer actually begins)
-- **Friday Block**: Mechanism that locks certain prayer times to Friday's values for the entire week
 - **CeilingToNearest5**: Round up to the nearest 5-minute boundary (e.g., 20:31 → 20:35)
 - **CeilingToNearest30**: Round up to the nearest 30-minute boundary (e.g., 15:20 → 15:30)
 
@@ -81,6 +79,8 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 3. **Asr (Afternoon)** — Clean 30-minute intervals
 4. **Maghrib (Sunset)** — Simple 5-minute offset
 5. **Isha (Night)** — Seasonal scaling based on sunset time
+
+Each prayer uses its own astronomical time for maximum accuracy.
 
 For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md`.
 

@@ -11,7 +11,6 @@ This document explains the Islamic prayer time (Iqama) calculation rules used in
 
 - **Azan**: The raw astronomical prayer time calculated by the `adhan` library
 - **Iqama**: The congregation start time (when the prayer actually begins)
-- **Friday Block**: A mechanism that locks Fajr, Asr, and Isha Iqama times to the preceding Friday's values for the entire week
 - **DST**: Daylight Saving Time
 - **CeilingToNearest5**: Round up to the nearest 5-minute boundary (e.g., 20:31 → 20:35)
 - **CeilingToNearest30**: Round up to the nearest 30-minute boundary (e.g., 15:20 → 15:30, 15:35 → 16:00)
@@ -24,6 +23,8 @@ This document explains the Islamic prayer time (Iqama) calculation rules used in
 4. **Maghrib** (Sunset) — Simple 5-minute offset
 5. **Isha** (Night) — Seasonal scaling based on sunset time
 
+Each prayer uses its own astronomical time for maximum accuracy.
+
 ## Rule Files
 
 Each prayer has its own rule file in `src/rules/`:
@@ -33,14 +34,16 @@ Each prayer has its own rule file in `src/rules/`:
 - `asr.rule.ts` — Asr calculation (FR4)
 - `maghrib.rule.ts` — Maghrib calculation (FR1)
 - `isha.rule.ts` — Isha calculation (FR4)
-- `friday-block.rule.ts` — Friday Block mechanism (FR5)
 
 ## Key Principles
 
-### 1. Predictability
-Iqama times should be easy to remember and consistent. This is why we use rounding functions (CeilingToNearest5, CeilingToNearest30) to create clean clock times.
+### 1. Accuracy
+Each day uses its own astronomical prayer times for maximum accuracy. Prayer times change gradually throughout the year following the sun's position.
 
-### 2. Practicality
+### 2. Predictability
+Iqama times use rounding functions (CeilingToNearest5, CeilingToNearest30) to create clean clock times that are easy to remember.
+
+### 3. Practicality
 Rules balance religious requirements with practical concerns:
 - Fajr: Protect sleep in summer, allow time for work commute in winter
 - Dhuhr: Fixed time regardless of astronomical noon
@@ -48,16 +51,10 @@ Rules balance religious requirements with practical concerns:
 - Maghrib: Quick start after sunset
 - Isha: Avoid unreasonably late nights in summer
 
-### 3. Friday Block Stability
-Fajr, Asr, and Isha times remain constant throughout the week (locked to Friday's calculation). This allows worshippers to memorize the schedule without checking daily. Maghrib and Dhuhr are excluded because:
-- Maghrib changes significantly day-to-day (sunset time varies)
-- Dhuhr is already a fixed time (DST-based)
-
 ## Rule Execution Order
 
-1. **Friday Block** (FR5) — Determine if we should use Friday's data
-2. **Individual Prayer Rules** (FR1-FR4) — Calculate Iqama for each prayer
-3. **Override Interception** (FR6) — Apply admin overrides if present
+1. **Individual Prayer Rules** (FR1-FR4) — Calculate Iqama for each prayer based on that day's Azan
+2. **Override Interception** (FR6) — Apply admin overrides if present
 
 ## When to Modify Rules
 
@@ -67,10 +64,10 @@ Fajr, Asr, and Isha times remain constant throughout the week (locked to Friday'
 - New requirements emerge (e.g., Ramadan adjustments)
 
 **DO NOT modify** without:
-- Understanding the impact on the entire week (Friday Block)
 - Testing across all seasons (summer/winter extremes)
 - Consulting the requirements and design documents
 - Updating property-based tests
+- Ensuring the critical invariant: Iqama >= Azan
 
 ## Testing Philosophy
 
@@ -79,4 +76,7 @@ Each rule should have:
 2. **Property tests** — Invariants that must hold for all inputs
 3. **Integration tests** — End-to-end API validation
 
-See the design document for the 14 correctness properties that govern these rules.
+### Critical Invariant
+
+**Iqama must always be >= Azan** for all prayers. This is the most important correctness property.
+

@@ -4,6 +4,7 @@ export declare class AdminController {
     private readonly prisma;
     constructor(prisma: PrismaService);
     createOverride(dto: CreateOverrideDto): Promise<{
+        id: number;
         prayer: string;
         overrideType: string;
         value: string;
@@ -11,9 +12,9 @@ export declare class AdminController {
         endDate: Date;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }>;
     listOverrides(): Promise<{
+        id: number;
         prayer: string;
         overrideType: string;
         value: string;
@@ -21,9 +22,9 @@ export declare class AdminController {
         endDate: Date;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }[]>;
     getOverride(id: number): Promise<{
+        id: number;
         prayer: string;
         overrideType: string;
         value: string;
@@ -31,7 +32,6 @@ export declare class AdminController {
         endDate: Date;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }>;
     deleteOverride(id: number): Promise<void>;
     clearAllOverrides(): Promise<void>;

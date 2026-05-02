@@ -19,6 +19,6 @@ function computeIshaIqama(ishaAzan) {
         const minutesSince2000 = totalMinutes - boundary2000;
         gap = 15 - 10 * (minutesSince2000 / 150);
     }
-    return (0, time_utils_1.formatHHmm)((0, time_utils_1.ceilingToNearest5)(ishaAzan.add(gap, 'minute')));
+    return (0, time_utils_1.formatHHmm)((0, time_utils_1.ceilingToNearest5)(ishaAzan.add(Math.round(gap * 60), 'second')));
 }
 //# sourceMappingURL=isha.rule.js.map

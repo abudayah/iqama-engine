@@ -23,7 +23,6 @@ const dayjs_1 = __importDefault(require("../dayjs"));
 const adhan_adapter_1 = require("../adhan/adhan.adapter");
 const rules_service_1 = require("../rules/rules.service");
 const override_service_1 = require("../override/override.service");
-const friday_block_rule_1 = require("../rules/friday-block.rule");
 const dhuhr_rule_1 = require("../rules/dhuhr.rule");
 const time_utils_1 = require("../rules/time-utils");
 let CacheService = class CacheService {
@@ -49,14 +48,8 @@ let CacheService = class CacheService {
             const date = `${yearMonth}-${String(day).padStart(2, '0')}`;
             const dateObj = new Date(`${date}T12:00:00.000Z`);
             const raw = this.adhanAdapter.getPrayerTimes(dateObj);
-            const fridayDate = (0, friday_block_rule_1.getPrecedingFridayDate)(date, tz);
-            let fridayRaw = undefined;
-            if (fridayDate !== date) {
-                const fridayDateObj = new Date(`${fridayDate}T12:00:00.000Z`);
-                fridayRaw = this.adhanAdapter.getPrayerTimes(fridayDateObj);
-            }
             const overrides = await this.overrideService.getOverridesForDate(date);
-            const iqamaTimes = this.rulesService.computeIqama(date, raw, fridayRaw);
+            const iqamaTimes = this.rulesService.computeIqama(date, raw);
             const rawAzanMap = {
                 fajr: raw.fajr,
                 dhuhr: raw.dhuhr,
@@ -65,15 +58,18 @@ let CacheService = class CacheService {
                 isha: raw.isha,
             };
             const { iqamaTimes: finalIqama, hasOverrides } = this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
+            const fajrAzan = fridayRaw?.fajr ?? raw.fajr;
+            const asrAzan = fridayRaw?.asr ?? raw.asr;
+            const ishaAzan = fridayRaw?.isha ?? raw.isha;
             const schedule = {
                 date,
                 day_of_week: dayjs_1.default.tz(date, tz).format('dddd'),
                 is_dst: (0, dhuhr_rule_1.isDstActive)(date, tz),
-                fajr: { azan: (0, time_utils_1.formatHHmm)(raw.fajr), iqama: finalIqama.fajr },
+                fajr: { azan: (0, time_utils_1.formatHHmm)(fajrAzan), iqama: finalIqama.fajr },
                 dhuhr: { azan: (0, time_utils_1.formatHHmm)(raw.dhuhr), iqama: finalIqama.dhuhr },
-                asr: { azan: (0, time_utils_1.formatHHmm)(raw.asr), iqama: finalIqama.asr },
+                asr: { azan: (0, time_utils_1.formatHHmm)(asrAzan), iqama: finalIqama.asr },
                 maghrib: { azan: (0, time_utils_1.formatHHmm)(raw.maghrib), iqama: finalIqama.maghrib },
-                isha: { azan: (0, time_utils_1.formatHHmm)(raw.isha), iqama: finalIqama.isha },
+                isha: { azan: (0, time_utils_1.formatHHmm)(ishaAzan), iqama: finalIqama.isha },
                 metadata: {
                     calculation_method: 'ISNA',
                     has_overrides: hasOverrides,

@@ -186,4 +186,76 @@ describe('GET /api/v1/schedule (e2e)', () => {
       );
     });
   });
+
+  /**
+   * Prayer Time Accuracy Tests
+   *
+   * Validates: Core invariants and accuracy
+   * - Iqama must always be >= Azan (critical invariant)
+   * - Each day uses its own astronomical times
+   */
+  describe('Prayer time accuracy', () => {
+    it('should ensure Iqama >= Azan for all prayers (critical invariant)', async () => {
+      // Test a full week to ensure no day has Iqama before Azan
+      const START_DATE = '2026-05-01';
+      const END_DATE = '2026-05-07';
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/schedule?start_date=${START_DATE}&end_date=${END_DATE}`)
+        .expect(200);
+
+      const schedules = response.body;
+      const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+
+      for (const schedule of schedules) {
+        for (const prayer of prayers) {
+          const azan = schedule[prayer].azan;
+          const iqama = schedule[prayer].iqama;
+
+          // Convert HH:mm to minutes for comparison
+          const [azanHour, azanMin] = azan.split(':').map(Number);
+          const [iqamaHour, iqamaMin] = iqama.split(':').map(Number);
+          const azanMinutes = azanHour * 60 + azanMin;
+          const iqamaMinutes = iqamaHour * 60 + iqamaMin;
+
+          expect(iqamaMinutes).toBeGreaterThanOrEqual(azanMinutes);
+
+          // If this fails, it means Iqama is before Azan
+          if (iqamaMinutes < azanMinutes) {
+            throw new Error(
+              `${schedule.date} ${prayer}: Iqama (${iqama}) is before Azan (${azan})`,
+            );
+          }
+        }
+      }
+    });
+
+    it('should use each day own astronomical times', async () => {
+      const FRIDAY = '2026-05-01';
+      const SATURDAY = '2026-05-02';
+
+      const fridayResponse = await request(app.getHttpServer())
+        .get(`/api/v1/schedule?date=${FRIDAY}`)
+        .expect(200);
+
+      const saturdayResponse = await request(app.getHttpServer())
+        .get(`/api/v1/schedule?date=${SATURDAY}`)
+        .expect(200);
+
+      const friday = fridayResponse.body;
+      const saturday = saturdayResponse.body;
+
+      // Azan times should be different (each day uses its own astronomical times)
+      // At least one prayer should have different Azan times
+      const azanDifferences = [
+        friday.fajr.azan !== saturday.fajr.azan,
+        friday.asr.azan !== saturday.asr.azan,
+        friday.maghrib.azan !== saturday.maghrib.azan,
+        friday.isha.azan !== saturday.isha.azan,
+      ];
+
+      const hasDifferences = azanDifferences.some((diff) => diff);
+      expect(hasDifferences).toBe(true);
+    });
+  });
 });
