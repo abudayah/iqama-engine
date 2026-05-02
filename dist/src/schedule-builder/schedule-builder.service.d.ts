@@ -2,8 +2,8 @@ import { ConfigService } from '@nestjs/config';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
 import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
-import { DailySchedule } from './daily-schedule.interface';
-export declare class CacheService {
+import { DailySchedule } from '../cache/daily-schedule.interface';
+export declare class ScheduleBuilderService {
     private readonly adhanAdapter;
     private readonly rulesService;
     private readonly overrideService;
@@ -11,5 +11,5 @@ export declare class CacheService {
     private readonly timezone;
     constructor(adhanAdapter: AdhanAdapter, rulesService: RulesService, overrideService: OverrideService, configService: ConfigService);
     buildMonth(yearMonth: string): Promise<DailySchedule[]>;
-    getOrBuildMonth(yearMonth: string): Promise<DailySchedule[]>;
+    getMonth(yearMonth: string): Promise<DailySchedule[]>;
 }

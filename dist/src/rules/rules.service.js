@@ -24,16 +24,12 @@ let RulesService = class RulesService {
         this.configService = configService;
         this.timezone = this.configService.get('app.masjidTimezone');
     }
-    computeIqama(date, raw, fridayRaw) {
-        const fajrAzan = fridayRaw?.fajr ?? raw.fajr;
-        const sunriseForFajr = fridayRaw?.sunrise ?? raw.sunrise;
-        const fajr = (0, fajr_rule_1.computeFajrIqama)(fajrAzan, sunriseForFajr);
+    computeIqama(date, raw) {
+        const fajr = (0, fajr_rule_1.computeFajrIqama)(raw.fajr, raw.sunrise);
         const dhuhr = (0, dhuhr_rule_1.computeDhuhrIqama)(date, this.timezone);
-        const asrAzan = fridayRaw?.asr ?? raw.asr;
-        const asr = (0, asr_rule_1.computeAsrIqama)(asrAzan);
+        const asr = (0, asr_rule_1.computeAsrIqama)(raw.asr);
         const maghrib = (0, maghrib_rule_1.computeMaghribIqama)(raw.maghrib);
-        const ishaAzan = fridayRaw?.isha ?? raw.isha;
-        const isha = (0, isha_rule_1.computeIshaIqama)(ishaAzan);
+        const isha = (0, isha_rule_1.computeIshaIqama)(raw.isha);
         return { fajr, dhuhr, asr, maghrib, isha };
     }
 };

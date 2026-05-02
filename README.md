@@ -11,7 +11,6 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 - **Astronomical Calculations**: Uses the `adhan` library for precise prayer time calculations based on geographic coordinates
 - **Custom Business Rules**: Implements five prayer-specific calculation rules (Fajr, Dhuhr, Asr, Maghrib, Isha)
 - **Admin Overrides**: Allows manual time adjustments for special occasions (Ramadan, holidays, etc.)
-- **Intelligent Caching**: Monthly schedule caching with Redis (Upstash) for optimal performance
 - **RESTful API**: Clean, versioned API endpoints for schedule retrieval and admin management
 
 ## Architecture
@@ -47,19 +46,19 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
                     │                       │
                     ▼                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Data & Cache Layer                        │
+│                      Data Layer                              │
 │  ┌──────────────────┐         ┌──────────────────┐         │
-│  │ Cache Service    │         │ Prisma Service   │         │
-│  │ (Redis/Memory)   │         │ (MySQL)          │         │
+│  │ Schedule Builder │         │ Prisma Service   │         │
+│  │ Service          │         │ (MySQL)          │         │
 │  └──────────────────┘         └──────────────────┘         │
 └─────────────────────────────────────────────────────────────┘
                     │                       │
                     ▼                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   External Services                          │
-│  ┌──────────────────┐         ┌──────────────────┐         │
-│  │ Upstash Redis    │         │ MySQL Database   │         │
-│  └──────────────────┘         └──────────────────┘         │
+│  ┌──────────────────────────────────────────────────────────┤
+│  │ MySQL Database                                           │
+│  └──────────────────────────────────────────────────────────┘
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -207,7 +206,6 @@ X-API-Key: your-admin-api-key
 
 - Node.js 18+ and npm
 - MySQL database
-- (Optional) Upstash Redis account for persistent caching
 
 ### Setup
 
@@ -245,10 +243,6 @@ DATABASE_URL=mysql://user:password@localhost:3306/iqama
 
 # Admin API Security
 ADMIN_API_KEY=your-secure-random-key
-
-# Optional: Upstash Redis
-UPSTASH_REDIS_URL=https://your-instance.upstash.io
-UPSTASH_REDIS_TOKEN=your-token
 ```
 
 4. **Set up the database**
@@ -281,7 +275,7 @@ iqama-engine/
 │   ├── adhan/              # Adhan library adapter
 │   ├── admin/              # Admin endpoints & DTOs
 │   ├── auth/               # API key authentication
-│   ├── cache/              # Caching service (Redis/Memory)
+│   ├── cache/              # Daily schedule interface
 │   ├── config/             # Configuration module
 │   ├── health/             # Health check endpoint
 │   ├── override/           # Override management service
@@ -355,22 +349,6 @@ MASJID_TIMEZONE=America/Vancouver
 
 These values are used for astronomical calculations via the `adhan` library.
 
-### Caching Strategy
-
-The service supports two caching modes:
-
-1. **Redis (Upstash)** — Persistent, distributed cache (recommended for production)
-2. **In-Memory** — Fallback cache when Redis is unavailable
-
-Configure Redis in `.env`:
-
-```env
-UPSTASH_REDIS_URL=https://your-instance.upstash.io
-UPSTASH_REDIS_TOKEN=your-token
-```
-
-If Redis credentials are missing or connection fails, the service automatically falls back to in-memory caching.
-
 ### Database
 
 The service uses MySQL with Prisma ORM. Configure the connection string:
@@ -405,7 +383,6 @@ openssl rand -hex 32
 
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure production database
-- [ ] Set up Upstash Redis for caching
 - [ ] Generate secure `ADMIN_API_KEY`
 - [ ] Configure reverse proxy (nginx, Caddy)
 - [ ] Set up SSL/TLS certificates

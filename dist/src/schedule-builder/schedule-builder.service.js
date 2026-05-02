@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CacheService = void 0;
+exports.ScheduleBuilderService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const dayjs_1 = __importDefault(require("../dayjs"));
@@ -21,7 +21,7 @@ const rules_service_1 = require("../rules/rules.service");
 const override_service_1 = require("../override/override.service");
 const dhuhr_rule_1 = require("../rules/dhuhr.rule");
 const time_utils_1 = require("../rules/time-utils");
-let CacheService = class CacheService {
+let ScheduleBuilderService = class ScheduleBuilderService {
     adhanAdapter;
     rulesService;
     overrideService;
@@ -70,17 +70,16 @@ let CacheService = class CacheService {
         }
         return schedules;
     }
-    async getOrBuildMonth(yearMonth) {
-        const schedules = await this.buildMonth(yearMonth);
-        return schedules;
+    async getMonth(yearMonth) {
+        return this.buildMonth(yearMonth);
     }
 };
-exports.CacheService = CacheService;
-exports.CacheService = CacheService = __decorate([
+exports.ScheduleBuilderService = ScheduleBuilderService;
+exports.ScheduleBuilderService = ScheduleBuilderService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [adhan_adapter_1.AdhanAdapter,
         rules_service_1.RulesService,
         override_service_1.OverrideService,
         config_1.ConfigService])
-], CacheService);
-//# sourceMappingURL=cache.service.js.map
+], ScheduleBuilderService);
+//# sourceMappingURL=schedule-builder.service.js.map

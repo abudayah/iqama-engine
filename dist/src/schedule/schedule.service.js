@@ -15,15 +15,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ScheduleService = void 0;
 const common_1 = require("@nestjs/common");
 const dayjs_1 = __importDefault(require("../dayjs"));
-const cache_service_1 = require("../cache/cache.service");
+const schedule_builder_service_1 = require("../schedule-builder/schedule-builder.service");
 let ScheduleService = class ScheduleService {
-    cacheService;
-    constructor(cacheService) {
-        this.cacheService = cacheService;
+    scheduleBuilder;
+    constructor(scheduleBuilder) {
+        this.scheduleBuilder = scheduleBuilder;
     }
     async getScheduleForDate(date) {
         const yearMonth = date.substring(0, 7);
-        const schedules = await this.cacheService.getOrBuildMonth(yearMonth);
+        const schedules = await this.scheduleBuilder.getMonth(yearMonth);
         const schedule = schedules.find((s) => s.date === date);
         if (!schedule) {
             throw new common_1.NotFoundException(`No schedule found for date ${date}`);
@@ -41,7 +41,7 @@ let ScheduleService = class ScheduleService {
         }
         const allSchedules = [];
         for (const yearMonth of monthsNeeded) {
-            const schedules = await this.cacheService.getOrBuildMonth(yearMonth);
+            const schedules = await this.scheduleBuilder.getMonth(yearMonth);
             allSchedules.push(...schedules);
         }
         return allSchedules.filter((s) => s.date >= startDate && s.date <= endDate);
@@ -50,6 +50,6 @@ let ScheduleService = class ScheduleService {
 exports.ScheduleService = ScheduleService;
 exports.ScheduleService = ScheduleService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [cache_service_1.CacheService])
+    __metadata("design:paramtypes", [schedule_builder_service_1.ScheduleBuilderService])
 ], ScheduleService);
 //# sourceMappingURL=schedule.service.js.map

@@ -6,18 +6,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AppCacheModule = void 0;
+exports.ScheduleBuilderModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const adhan_module_1 = require("../adhan/adhan.module");
 const rules_module_1 = require("../rules/rules.module");
 const override_module_1 = require("../override/override.module");
 const prisma_module_1 = require("../prisma/prisma.module");
-const cache_service_1 = require("./cache.service");
-let AppCacheModule = class AppCacheModule {
+const schedule_builder_service_1 = require("./schedule-builder.service");
+let ScheduleBuilderModule = class ScheduleBuilderModule {
 };
-exports.AppCacheModule = AppCacheModule;
-exports.AppCacheModule = AppCacheModule = __decorate([
+exports.ScheduleBuilderModule = ScheduleBuilderModule;
+exports.ScheduleBuilderModule = ScheduleBuilderModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule,
@@ -26,8 +26,8 @@ exports.AppCacheModule = AppCacheModule = __decorate([
             override_module_1.OverrideModule,
             prisma_module_1.PrismaModule,
         ],
-        providers: [cache_service_1.CacheService],
-        exports: [cache_service_1.CacheService],
+        providers: [schedule_builder_service_1.ScheduleBuilderService],
+        exports: [schedule_builder_service_1.ScheduleBuilderService],
     })
-], AppCacheModule);
-//# sourceMappingURL=cache.module.js.map
+], ScheduleBuilderModule);
+//# sourceMappingURL=schedule-builder.module.js.map

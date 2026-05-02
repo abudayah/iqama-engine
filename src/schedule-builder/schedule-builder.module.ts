@@ -4,7 +4,7 @@ import { AdhanModule } from '../adhan/adhan.module';
 import { RulesModule } from '../rules/rules.module';
 import { OverrideModule } from '../override/override.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { CacheService } from './cache.service';
+import { ScheduleBuilderService } from './schedule-builder.service';
 
 @Module({
   imports: [
@@ -14,7 +14,7 @@ import { CacheService } from './cache.service';
     OverrideModule,
     PrismaModule,
   ],
-  providers: [CacheService],
-  exports: [CacheService],
+  providers: [ScheduleBuilderService],
+  exports: [ScheduleBuilderService],
 })
-export class AppCacheModule {}
+export class ScheduleBuilderModule {}

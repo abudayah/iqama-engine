@@ -11,5 +11,5 @@ export declare class RulesService {
     private readonly configService;
     private readonly timezone;
     constructor(configService: ConfigService);
-    computeIqama(date: string, raw: RawPrayerTimes, fridayRaw?: RawPrayerTimes): IqamaTimes;
+    computeIqama(date: string, raw: RawPrayerTimes): IqamaTimes;
 }

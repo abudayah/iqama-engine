@@ -3,12 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.computeFajrIqama = computeFajrIqama;
 const time_utils_1 = require("./time-utils");
 function computeFajrIqama(fajrAzan, sunrise) {
-    const maxDelay = fajrAzan.add(75, 'minute');
-    const safeSunriseLimit = sunrise.subtract(45, 'minute');
+    const fajrAzanClean = fajrAzan.startOf('minute');
+    const sunriseClean = sunrise.startOf('minute');
+    const maxDelay = fajrAzanClean.add(75, 'minute');
+    const safeSunriseLimit = sunriseClean.subtract(45, 'minute');
     let baseTarget = maxDelay.isBefore(safeSunriseLimit)
         ? maxDelay
         : safeSunriseLimit;
-    const floorClamp = fajrAzan.add(10, 'minute');
+    const floorClamp = fajrAzanClean.add(10, 'minute');
     if (baseTarget.isBefore(floorClamp)) {
         baseTarget = floorClamp;
     }

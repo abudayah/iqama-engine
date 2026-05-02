@@ -2,15 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Dayjs } from 'dayjs';
 import dayjs from '../dayjs';
-import { AdhanAdapter, RawPrayerTimes } from '../adhan/adhan.adapter';
+import { AdhanAdapter } from '../adhan/adhan.adapter';
 import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
-import { DailySchedule } from './daily-schedule.interface';
+import { DailySchedule } from '../cache/daily-schedule.interface';
 
 @Injectable()
-export class CacheService {
+export class ScheduleBuilderService {
   private readonly timezone: string;
 
   constructor(
@@ -82,9 +82,7 @@ export class CacheService {
     return schedules;
   }
 
-  async getOrBuildMonth(yearMonth: string): Promise<DailySchedule[]> {
-    // Always build fresh (no caching)
-    const schedules = await this.buildMonth(yearMonth);
-    return schedules;
+  async getMonth(yearMonth: string): Promise<DailySchedule[]> {
+    return this.buildMonth(yearMonth);
   }
 }

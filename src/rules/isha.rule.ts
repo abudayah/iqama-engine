@@ -10,8 +10,11 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
  * Iqama = CeilingToNearest5(Azan + gap)
  */
 export function computeIshaIqama(ishaAzan: Dayjs): string {
-  const hour = ishaAzan.hour();
-  const minute = ishaAzan.minute();
+  // Strip seconds from Azan time for clean minute-based calculations
+  const ishaAzanClean = ishaAzan.startOf('minute');
+  
+  const hour = ishaAzanClean.hour();
+  const minute = ishaAzanClean.minute();
   const totalMinutes = hour * 60 + minute;
 
   const boundary2230 = 22 * 60 + 30; // 1350
@@ -27,5 +30,8 @@ export function computeIshaIqama(ishaAzan: Dayjs): string {
     gap = 15 - 10 * (minutesSince2000 / 150);
   }
 
-  return formatHHmm(ceilingToNearest5(ishaAzan.add(Math.round(gap), 'minute')));
+  const roundedGap = Math.round(gap);
+  const result = ceilingToNearest5(ishaAzanClean.add(roundedGap, 'minute'));
+  
+  return formatHHmm(result);
 }

@@ -8,5 +8,7 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
  * No Friday Block applied. Uses the date's own Azan.
  */
 export function computeMaghribIqama(maghribAzan: Dayjs): string {
-  return formatHHmm(ceilingToNearest5(maghribAzan.add(5, 'minute')));
+  // Strip seconds for clean minute-based calculations
+  const maghribAzanClean = maghribAzan.startOf('minute');
+  return formatHHmm(ceilingToNearest5(maghribAzanClean.add(5, 'minute')));
 }

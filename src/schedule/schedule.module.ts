@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { AppCacheModule } from '../cache/cache.module';
+import { ScheduleBuilderModule } from '../schedule-builder/schedule-builder.module';
 import { ScheduleService } from './schedule.service';
 import { ScheduleController } from './schedule.controller';
 
 @Module({
-  imports: [AppCacheModule],
+  imports: [ScheduleBuilderModule],
   controllers: [ScheduleController],
   providers: [ScheduleService],
   exports: [ScheduleService],

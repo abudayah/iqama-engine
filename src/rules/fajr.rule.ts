@@ -11,14 +11,18 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
  * Iqama = CeilingToNearest5(Base_Target)
  */
 export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
-  const maxDelay = fajrAzan.add(75, 'minute');
-  const safeSunriseLimit = sunrise.subtract(45, 'minute');
+  // Strip seconds for clean minute-based calculations
+  const fajrAzanClean = fajrAzan.startOf('minute');
+  const sunriseClean = sunrise.startOf('minute');
+  
+  const maxDelay = fajrAzanClean.add(75, 'minute');
+  const safeSunriseLimit = sunriseClean.subtract(45, 'minute');
 
   let baseTarget = maxDelay.isBefore(safeSunriseLimit)
     ? maxDelay
     : safeSunriseLimit;
 
-  const floorClamp = fajrAzan.add(10, 'minute');
+  const floorClamp = fajrAzanClean.add(10, 'minute');
   if (baseTarget.isBefore(floorClamp)) {
     baseTarget = floorClamp;
   }

@@ -1,15 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import dayjs from '../dayjs';
-import { CacheService } from '../cache/cache.service';
+import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { DailySchedule } from '../cache/daily-schedule.interface';
 
 @Injectable()
 export class ScheduleService {
-  constructor(private readonly cacheService: CacheService) {}
+  constructor(private readonly scheduleBuilder: ScheduleBuilderService) {}
 
   async getScheduleForDate(date: string): Promise<DailySchedule> {
     const yearMonth = date.substring(0, 7); // "YYYY-MM"
-    const schedules = await this.cacheService.getOrBuildMonth(yearMonth);
+    const schedules = await this.scheduleBuilder.getMonth(yearMonth);
     const schedule = schedules.find((s) => s.date === date);
     if (!schedule) {
       throw new NotFoundException(`No schedule found for date ${date}`);
@@ -32,7 +32,7 @@ export class ScheduleService {
     // Fetch all months
     const allSchedules: DailySchedule[] = [];
     for (const yearMonth of monthsNeeded) {
-      const schedules = await this.cacheService.getOrBuildMonth(yearMonth);
+      const schedules = await this.scheduleBuilder.getMonth(yearMonth);
       allSchedules.push(...schedules);
     }
 
