@@ -1,98 +1,474 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Iqama Engine
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A NestJS-based REST API service that calculates Islamic prayer congregation times (Iqama) based on astronomical prayer times (Azan). The service implements custom business rules to transform raw prayer times into practical, community-friendly congregation schedules.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Overview
 
-## Description
+The Iqama Engine takes astronomical prayer times from the `adhan` library and applies sophisticated calculation rules to determine when congregational prayers should begin. These rules balance religious requirements with practical considerations like work schedules, seasonal variations, and community preferences.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### Key Features
 
-## Project setup
+- **Astronomical Calculations**: Uses the `adhan` library for precise prayer time calculations based on geographic coordinates
+- **Custom Business Rules**: Implements five prayer-specific calculation rules (Fajr, Dhuhr, Asr, Maghrib, Isha)
+- **Friday Block Mechanism**: Locks Fajr, Asr, and Isha times to Friday's values for the entire week for consistency
+- **Admin Overrides**: Allows manual time adjustments for special occasions (Ramadan, holidays, etc.)
+- **Intelligent Caching**: Monthly schedule caching with Redis (Upstash) for optimal performance
+- **RESTful API**: Clean, versioned API endpoints for schedule retrieval and admin management
 
-```bash
-$ npm install
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         API Layer                            │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │ Schedule         │         │ Admin            │         │
+│  │ Controller       │         │ Controller       │         │
+│  └──────────────────┘         └──────────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                    │                       │
+                    ▼                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Business Logic                          │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │ Schedule         │         │ Override         │         │
+│  │ Service          │         │ Service          │         │
+│  └──────────────────┘         └──────────────────┘         │
+│           │                                                  │
+│           ▼                                                  │
+│  ┌──────────────────┐                                       │
+│  │ Rules Engine     │                                       │
+│  │ • Fajr Rule      │                                       │
+│  │ • Dhuhr Rule     │                                       │
+│  │ • Asr Rule       │                                       │
+│  │ • Maghrib Rule   │                                       │
+│  │ • Isha Rule      │                                       │
+│  │ • Friday Block   │                                       │
+│  └──────────────────┘                                       │
+└─────────────────────────────────────────────────────────────┘
+                    │                       │
+                    ▼                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Data & Cache Layer                        │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │ Cache Service    │         │ Prisma Service   │         │
+│  │ (Redis/Memory)   │         │ (MySQL)          │         │
+│  └──────────────────┘         └──────────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                    │                       │
+                    ▼                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   External Services                          │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │ Upstash Redis    │         │ MySQL Database   │         │
+│  └──────────────────┘         └──────────────────┘         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Compile and run the project
+## Prayer Calculation Rules
 
-```bash
-# development
-$ npm run start
+### Glossary
 
-# watch mode
-$ npm run start:dev
+- **Azan**: Raw astronomical prayer time calculated by the `adhan` library
+- **Iqama**: Congregation start time (when the prayer actually begins)
+- **Friday Block**: Mechanism that locks certain prayer times to Friday's values for the entire week
+- **CeilingToNearest5**: Round up to the nearest 5-minute boundary (e.g., 20:31 → 20:35)
+- **CeilingToNearest30**: Round up to the nearest 30-minute boundary (e.g., 15:20 → 15:30)
 
-# production mode
-$ npm run start:prod
+### The Five Prayers
+
+1. **Fajr (Dawn)** — Dynamic calculation with sunrise protection
+2. **Dhuhr (Noon)** — Fixed time based on DST status
+3. **Asr (Afternoon)** — Clean 30-minute intervals
+4. **Maghrib (Sunset)** — Simple 5-minute offset
+5. **Isha (Night)** — Seasonal scaling based on sunset time
+
+For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md`.
+
+## API Endpoints
+
+### Public Endpoints
+
+#### Get Schedule for a Single Date
+
+```http
+GET /api/v1/schedule?date=YYYY-MM-DD
 ```
 
-## Run tests
+**Example:**
+```bash
+curl "http://localhost:3000/api/v1/schedule?date=2026-05-02"
+```
+
+**Response:**
+```json
+{
+  "date": "2026-05-02",
+  "fajr": {
+    "azan": "04:15",
+    "iqama": "05:30"
+  },
+  "dhuhr": {
+    "azan": "13:10",
+    "iqama": "13:30"
+  },
+  "asr": {
+    "azan": "17:25",
+    "iqama": "18:00"
+  },
+  "maghrib": {
+    "azan": "20:45",
+    "iqama": "20:50"
+  },
+  "isha": {
+    "azan": "22:30",
+    "iqama": "22:35"
+  }
+}
+```
+
+#### Get Schedule for a Date Range
+
+```http
+GET /api/v1/schedule?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+```
+
+**Example:**
+```bash
+curl "http://localhost:3000/api/v1/schedule?start_date=2026-05-01&end_date=2026-05-07"
+```
+
+**Response:**
+```json
+[
+  {
+    "date": "2026-05-01",
+    "fajr": { "azan": "04:16", "iqama": "05:30" },
+    ...
+  },
+  {
+    "date": "2026-05-02",
+    "fajr": { "azan": "04:15", "iqama": "05:30" },
+    ...
+  }
+]
+```
+
+### Admin Endpoints
+
+All admin endpoints require authentication via the `X-API-Key` header.
+
+#### Create Override
+
+```http
+POST /api/v1/admin/overrides
+X-API-Key: your-admin-api-key
+Content-Type: application/json
+
+{
+  "prayer": "fajr",
+  "overrideType": "iqama",
+  "value": "05:00",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-30"
+}
+```
+
+#### List All Overrides
+
+```http
+GET /api/v1/admin/overrides
+X-API-Key: your-admin-api-key
+```
+
+#### Get Specific Override
+
+```http
+GET /api/v1/admin/overrides/:id
+X-API-Key: your-admin-api-key
+```
+
+#### Delete Override
+
+```http
+DELETE /api/v1/admin/overrides/:id
+X-API-Key: your-admin-api-key
+```
+
+#### Clear All Overrides
+
+```http
+DELETE /api/v1/admin/overrides
+X-API-Key: your-admin-api-key
+```
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- MySQL database
+- (Optional) Upstash Redis account for persistent caching
+
+### Setup
+
+1. **Clone the repository**
 
 ```bash
-# unit tests
-$ npm run test
+git clone <repository-url>
+cd iqama-engine
+```
 
-# e2e tests
-$ npm run test:e2e
+2. **Install dependencies**
 
-# test coverage
-$ npm run test:cov
+```bash
+npm install
+```
+
+3. **Configure environment variables**
+
+Copy `.env.example` to `.env` and fill in the required values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your configuration:
+
+```env
+# Masjid Location
+MASJID_LATITUDE=49.2514
+MASJID_LONGITUDE=-122.7740
+MASJID_TIMEZONE=America/Vancouver
+
+# Database
+DATABASE_URL=mysql://user:password@localhost:3306/iqama
+
+# Admin API Security
+ADMIN_API_KEY=your-secure-random-key
+
+# Optional: Upstash Redis
+UPSTASH_REDIS_URL=https://your-instance.upstash.io
+UPSTASH_REDIS_TOKEN=your-token
+```
+
+4. **Set up the database**
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
+```
+
+5. **Start the service**
+
+```bash
+# Development mode with hot reload
+npm run start:dev
+
+# Production mode
+npm run build
+npm run start:prod
+```
+
+The API will be available at `http://localhost:3000`.
+
+## Development
+
+### Project Structure
+
+```
+iqama-engine/
+├── src/
+│   ├── adhan/              # Adhan library adapter
+│   ├── admin/              # Admin endpoints & DTOs
+│   ├── auth/               # API key authentication
+│   ├── cache/              # Caching service (Redis/Memory)
+│   ├── config/             # Configuration module
+│   ├── health/             # Health check endpoint
+│   ├── override/           # Override management service
+│   ├── prisma/             # Database service
+│   ├── rules/              # Prayer calculation rules
+│   │   ├── fajr.rule.ts
+│   │   ├── dhuhr.rule.ts
+│   │   ├── asr.rule.ts
+│   │   ├── maghrib.rule.ts
+│   │   ├── isha.rule.ts
+│   │   ├── friday-block.rule.ts
+│   │   └── time-utils.ts
+│   ├── schedule/           # Schedule endpoints & service
+│   ├── app.module.ts
+│   └── main.ts
+├── prisma/
+│   └── schema.prisma       # Database schema
+├── test/                   # E2E tests
+└── .kiro/                  # Kiro AI configuration
+    └── steering/           # Project documentation
+```
+
+### Available Scripts
+
+```bash
+# Development
+npm run start:dev           # Start with hot reload
+npm run start:debug         # Start with debugger
+
+# Building
+npm run build               # Compile TypeScript
+
+# Testing
+npm run test                # Run unit tests
+npm run test:watch          # Run tests in watch mode
+npm run test:cov            # Run tests with coverage
+npm run test:e2e            # Run end-to-end tests
+
+# Code Quality
+npm run lint                # Lint and fix code
+npm run format              # Format code with Prettier
+```
+
+### Testing
+
+The project uses Jest for testing with three test types:
+
+1. **Unit Tests** — Test individual functions and components
+2. **Property-Based Tests** — Use `fast-check` to verify invariants
+3. **E2E Tests** — Test complete API workflows
+
+Run tests:
+
+```bash
+npm run test                # All unit tests
+npm run test:e2e            # End-to-end tests
+npm run test:cov            # With coverage report
+```
+
+## Configuration
+
+### Masjid Location
+
+Set your masjid's coordinates and timezone in `.env`:
+
+```env
+MASJID_LATITUDE=49.2514
+MASJID_LONGITUDE=-122.7740
+MASJID_TIMEZONE=America/Vancouver
+```
+
+These values are used for astronomical calculations via the `adhan` library.
+
+### Caching Strategy
+
+The service supports two caching modes:
+
+1. **Redis (Upstash)** — Persistent, distributed cache (recommended for production)
+2. **In-Memory** — Fallback cache when Redis is unavailable
+
+Configure Redis in `.env`:
+
+```env
+UPSTASH_REDIS_URL=https://your-instance.upstash.io
+UPSTASH_REDIS_TOKEN=your-token
+```
+
+If Redis credentials are missing or connection fails, the service automatically falls back to in-memory caching.
+
+### Database
+
+The service uses MySQL with Prisma ORM. Configure the connection string:
+
+```env
+DATABASE_URL=mysql://user:password@localhost:3306/iqama
+```
+
+Run migrations:
+
+```bash
+npx prisma migrate deploy
+```
+
+### Admin API Security
+
+Protect admin endpoints with an API key:
+
+```env
+ADMIN_API_KEY=your-secure-random-key
+```
+
+Generate a secure key:
+
+```bash
+openssl rand -hex 32
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Production Checklist
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- [ ] Set `NODE_ENV=production`
+- [ ] Configure production database
+- [ ] Set up Upstash Redis for caching
+- [ ] Generate secure `ADMIN_API_KEY`
+- [ ] Configure reverse proxy (nginx, Caddy)
+- [ ] Set up SSL/TLS certificates
+- [ ] Configure logging and monitoring
+- [ ] Set up automated backups for MySQL
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+### Docker Deployment
+
+(Coming soon)
+
+### Environment Variables
+
+See `.env.example` for all available configuration options.
+
+## Health Check
+
+The service provides a health check endpoint:
+
+```http
+GET /health
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+**Response:**
+```json
+{
+  "status": "ok"
+}
+```
 
-## Resources
+## Contributing
 
-Check out a few resources that may come in handy when working with NestJS:
+### Modifying Prayer Rules
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+When modifying calculation rules:
 
-## Support
+1. Read the rule documentation in `.kiro/steering/prayer-rules-overview.md`
+2. Understand the impact on the Friday Block mechanism
+3. Test across all seasons (summer/winter extremes)
+4. Update property-based tests
+5. Document the change rationale
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Code Style
 
-## Stay in touch
+The project uses:
+- **ESLint** for linting
+- **Prettier** for formatting
+- **TypeScript** strict mode
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Run before committing:
+
+```bash
+npm run lint
+npm run format
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED - Private project
+
+## Support
+
+For questions or issues, please contact the development team.
+
+---
+
+Built with [NestJS](https://nestjs.com/) • Powered by [Adhan](https://github.com/batoulapps/adhan-js)
