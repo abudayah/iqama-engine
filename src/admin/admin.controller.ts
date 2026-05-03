@@ -43,12 +43,13 @@ export class AdminController {
   }
 
   /**
-   * List all overrides
+   * List all overrides (active only — excludes soft-deleted)
    * GET /api/v1/admin/overrides
    */
   @Get('overrides')
   async listOverrides() {
     const overrides = await this.prisma.override.findMany({
+      where: { deletedAt: null },
       orderBy: [{ startDate: 'desc' }, { prayer: 'asc' }],
     });
 
@@ -65,7 +66,7 @@ export class AdminController {
       where: { id },
     });
 
-    if (!override) {
+    if (!override || override.deletedAt !== null) {
       throw new NotFoundException(`Override with ID ${id} not found`);
     }
 
@@ -106,33 +107,36 @@ export class AdminController {
   }
 
   /**
-   * Delete an override
+   * Soft-delete an override (marks deletedAt, keeps record for analysis)
    * DELETE /api/v1/admin/overrides/:id
    */
   @Delete('overrides/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteOverride(@Param('id', ParseIntPipe) id: number) {
-    // Check if override exists
     const existing = await this.prisma.override.findUnique({
       where: { id },
     });
 
-    if (!existing) {
+    if (!existing || existing.deletedAt !== null) {
       throw new NotFoundException(`Override with ID ${id} not found`);
     }
 
-    await this.prisma.override.delete({
+    await this.prisma.override.update({
       where: { id },
+      data: { deletedAt: new Date() },
     });
   }
 
   /**
-   * Clear all overrides (use with caution)
+   * Soft-delete all active overrides (use with caution)
    * DELETE /api/v1/admin/overrides
    */
   @Delete('overrides')
   @HttpCode(HttpStatus.NO_CONTENT)
   async clearAllOverrides() {
-    await this.prisma.override.deleteMany();
+    await this.prisma.override.updateMany({
+      where: { deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
   }
 }

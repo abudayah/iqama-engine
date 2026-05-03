@@ -13,6 +13,7 @@ export interface Override {
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt: Date | null;
 }
 
 @Injectable()
@@ -27,6 +28,7 @@ export class OverrideService {
       where: {
         startDate: { lte: dateObj },
         endDate: { gte: dateObj },
+        deletedAt: null,
       },
     });
   }
