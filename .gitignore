@@ -1,6 +1,58 @@
-node_modules
-dist
-# Keep environment variables out of version control
-.env
+# Dependencies
+node_modules/
 
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env*.local
+
+# Testing
+coverage/
+.nyc_output
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
 /generated/prisma
+
+# Cache
+.cache/
+.eslintcache
+.npm
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backup files
+*.bak
+*~
+
+# Certificates and keys
+*.pem
+*.key
+*.cert
+*.crt

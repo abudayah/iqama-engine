@@ -1,4 +1,10 @@
-import { IsString, IsIn, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsIn,
+  IsDateString,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateOverrideDto {
   @IsString()
@@ -10,6 +16,14 @@ export class CreateOverrideDto {
   overrideType: 'FIXED' | 'OFFSET';
 
   @IsString()
+  @ValidateIf((o: CreateOverrideDto) => o.overrideType === 'FIXED')
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'FIXED value must be in HH:mm format (e.g., 04:30)',
+  })
+  @ValidateIf((o: CreateOverrideDto) => o.overrideType === 'OFFSET')
+  @Matches(/^[+-]?\d+$/, {
+    message: 'OFFSET value must be a number (e.g., +15 or -10)',
+  })
   value: string; // HH:mm for FIXED, numeric string (minutes) for OFFSET
 
   @IsDateString()

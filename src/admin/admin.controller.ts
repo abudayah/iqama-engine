@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -9,9 +10,11 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOverrideDto } from './dto/create-override.dto';
+import { UpdateOverrideDto } from './dto/update-override.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 
 @Controller('api/v1/admin')
@@ -63,10 +66,43 @@ export class AdminController {
     });
 
     if (!override) {
-      throw new Error(`Override with ID ${id} not found`);
+      throw new NotFoundException(`Override with ID ${id} not found`);
     }
 
     return override;
+  }
+
+  /**
+   * Update an existing override
+   * PATCH /api/v1/admin/overrides/:id
+   */
+  @Patch('overrides/:id')
+  async updateOverride(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateOverrideDto,
+  ) {
+    // Check if override exists
+    const existing = await this.prisma.override.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Override with ID ${id} not found`);
+    }
+
+    // Update the override
+    const updated = await this.prisma.override.update({
+      where: { id },
+      data: {
+        ...(dto.prayer && { prayer: dto.prayer }),
+        ...(dto.overrideType && { overrideType: dto.overrideType }),
+        ...(dto.value && { value: dto.value }),
+        ...(dto.startDate && { startDate: new Date(dto.startDate) }),
+        ...(dto.endDate && { endDate: new Date(dto.endDate) }),
+      },
+    });
+
+    return updated;
   }
 
   /**
@@ -76,6 +112,15 @@ export class AdminController {
   @Delete('overrides/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteOverride(@Param('id', ParseIntPipe) id: number) {
+    // Check if override exists
+    const existing = await this.prisma.override.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Override with ID ${id} not found`);
+    }
+
     await this.prisma.override.delete({
       where: { id },
     });
