@@ -48,8 +48,11 @@ export class ScheduleBuilderService {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = `${yearMonth}-${String(day).padStart(2, '0')}`;
 
-      // (a) Get raw prayer times for this day
-      const dateObj = new Date(`${date}T12:00:00.000Z`);
+      // (a) Get raw prayer times for this day.
+      // Use local noon in the masjid timezone (not UTC noon) so the adhan
+      // library receives the correct calendar date regardless of the server's
+      // system timezone.
+      const dateObj = dayjs.tz(`${date}T12:00:00`, tz).toDate();
       const raw = this.adhanAdapter.getPrayerTimes(dateObj);
 
       // (b) Get overrides for this day
