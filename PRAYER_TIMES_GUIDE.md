@@ -78,6 +78,16 @@ If DST (Daylight Saving Time):  1:45 PM
 If Standard Time:               12:45 PM
 ```
 
+**Friday (Jumu'ah) rule**:
+
+```
+Iqama = base time - 5 minutes  (shows Khutbah start time)
+DST Friday:           1:40 PM
+Standard Time Friday: 12:40 PM
+```
+
+The UI also renames the row from "Dhuhr" to "Friday" on Fridays.
+
 **Why Fixed?**
 
 - Dhuhr is a midday prayer that people plan their lunch/work around
@@ -226,13 +236,13 @@ bash run_all_tests.sh      # Full validation suite
 
 ## Quick Reference
 
-| Prayer      | Iqama Rule                       | Changes Per Year                   |
-| ----------- | -------------------------------- | ---------------------------------- |
-| **Fajr**    | Dynamic (Azan + 10-75 min)       | Variable (use overrides for fixed) |
-| **Dhuhr**   | Fixed (12:45 PM / 1:45 PM)       | 2 (DST transitions)                |
-| **Asr**     | Seasonal Fixed                   | 4 (seasonal)                       |
-| **Maghrib** | Azan + 5 min                     | Daily (follows sunset)             |
-| **Isha**    | Scaled (15-90 min after Maghrib) | Daily (follows season)             |
+| Prayer      | Iqama Rule                                           | Changes Per Year                   |
+| ----------- | ---------------------------------------------------- | ---------------------------------- |
+| **Fajr**    | Dynamic (Azan + 10-75 min)                           | Variable (use overrides for fixed) |
+| **Dhuhr**   | Fixed (12:45 PM / 1:45 PM); Friday: −5 min (Khutbah) | 2 (DST transitions)                |
+| **Asr**     | Seasonal Fixed                                       | 4 (seasonal)                       |
+| **Maghrib** | Azan + 5 min                                         | Daily (follows sunset)             |
+| **Isha**    | Scaled (15-90 min after Maghrib)                     | Daily (follows season)             |
 
 ---
 

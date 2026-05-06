@@ -49,12 +49,19 @@ Each prayer has its own rule file in `src/rules/`:
 
 **Admin Overrides**: Use overrides for fixed times during special periods (Ramadan, summer months).
 
-### Dhuhr (FR2) - Fixed by DST
+### Dhuhr (FR2) - Fixed by DST, Friday Jumu'ah adjustment
 
 **Calculation**:
 
 - DST (Daylight Saving Time): 1:45 PM
 - Standard Time: 12:45 PM
+
+**Friday (Jumu'ah) rule**:
+
+- The iqama column shows the **Khutbah start time**, which is 5 minutes before the actual prayer
+- DST Friday: 1:40 PM (`13:45 - 5 min`)
+- Standard Time Friday: 12:40 PM (`12:45 - 5 min`)
+- The UI renames the row label from "Dhuhr" to **"Friday"** on Fridays
 
 ### Asr (FR4) - Seasonal Fixed Times
 
@@ -177,7 +184,14 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 - Affects which Gregorian date is treated as the 1st of the next month.
 - Stored in `CalendarOverride` table.
 
-## Recent Changes (May 2026)
+### Friday (Jumu'ah) Rule Added
+
+**Change**: Dhuhr iqama on Fridays shows the Khutbah start time (5 minutes before the actual prayer)
+
+- DST Friday iqama: `13:40` (was `13:45`)
+- Standard Time Friday iqama: `12:40` (was `12:45`)
+- UI renames the Dhuhr row to "Friday" on Fridays
+- Implemented in `dhuhr.rule.ts` and `PrayerTable.tsx`
 
 ### Asr Rule Simplified
 
