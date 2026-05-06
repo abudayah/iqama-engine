@@ -56,7 +56,7 @@ Each prayer has its own rule file in `src/rules/`:
 - DST (Daylight Saving Time): 1:45 PM
 - Standard Time: 12:45 PM
 
-### Asr (FR4) - Seasonal Fixed Times ⭐ NEW
+### Asr (FR4) - Seasonal Fixed Times
 
 **Calculation**:
 
@@ -149,6 +149,29 @@ Rules balance religious requirements with practical concerns:
 - Updating property-based tests
 - Ensuring the critical invariant: Iqama >= Azan
 
+## Hijri Calendar Module
+
+The `src/hijri-calendar/` module handles Islamic calendar features that extend the base schedule:
+
+### Qiyam al-Layl (`qiyam_time`)
+
+- Injected into `DailySchedule` on **Hijri days 20–29 of month 9 (Ramadan)** only.
+- Day 30 is intentionally excluded (it is Eid eve, not a Qiyam night).
+- The start time is stored per Hijri year in `QiyamConfig` and fetched once per `buildMonth` call.
+- Field: `qiyam_time?: string` (HH:mm) on `DailySchedule`.
+
+### Eid Prayer Times (`eid_prayer_1`, `eid_prayer_2`)
+
+- Injected on the **astronomical Eid day** (1st Shawwal or 10th Dhul-Hijjah).
+- Times come from `SpecialPrayer` records saved by the admin; fallback to 07:00 / 08:30 if none exist.
+- Fields: `eid_prayer_1?: string`, `eid_prayer_2?: string` on `DailySchedule`.
+
+### Moon Sighting Override
+
+- Admins can override the Hijri month length (29 or 30 days) via `HijriCalendarController`.
+- Affects which Gregorian date is treated as the 1st of the next month.
+- Stored in `CalendarOverride` table.
+
 ## Recent Changes (May 2026)
 
 ### Asr Rule Simplified
@@ -169,6 +192,15 @@ Rules balance religious requirements with practical concerns:
 - Dynamic calculation remains as default
 - Overrides recommended for special periods
 - Provides flexibility while maintaining sunrise protection
+
+### Hijri Calendar Module Added
+
+**New module**: `src/hijri-calendar/` — Ramadan, Eid, and Qiyam management
+
+- `QiyamConfigService` — stores/retrieves Qiyam start time per Hijri year
+- `CalendarOverrideService` — stores moon-sighting length overrides
+- `HijriCalendarController` — REST endpoints for admin UI
+- `ScheduleBuilderService` updated to inject `qiyam_time` and Eid prayer times
 
 **See**: `PRAYER_TIMES_GUIDE.md` for complete documentation
 

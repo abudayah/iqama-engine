@@ -4,6 +4,7 @@ import { appConfig } from './config/app.config';
 import { ScheduleModule } from './schedule/schedule.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
+import { HijriCalendarModule } from './hijri-calendar/hijri-calendar.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { HealthModule } from './health/health.module';
     ScheduleModule,
     AdminModule,
     HealthModule,
+    HijriCalendarModule,
   ],
   controllers: [],
   providers: [],

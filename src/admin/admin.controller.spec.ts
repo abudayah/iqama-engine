@@ -8,7 +8,8 @@ import { ApiKeyGuard } from '../auth/api-key.guard';
 
 describe('AdminController', () => {
   let controller: AdminController;
-  let prismaService: jest.Mocked<PrismaService>;
+
+  let prismaService: any;
 
   const mockOverride = {
     id: 1,
@@ -19,6 +20,7 @@ describe('AdminController', () => {
     endDate: new Date('2026-08-31'),
     createdAt: new Date(),
     updatedAt: new Date(),
+    deletedAt: null,
   };
 
   beforeEach(async () => {
@@ -28,6 +30,7 @@ describe('AdminController', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn(),
       },
@@ -102,6 +105,7 @@ describe('AdminController', () => {
       const result = await controller.listOverrides();
 
       expect(prismaService.override.findMany).toHaveBeenCalledWith({
+        where: { deletedAt: null },
         orderBy: [{ startDate: 'desc' }, { prayer: 'asc' }],
       });
       expect(result).toEqual(overrides);
@@ -203,15 +207,19 @@ describe('AdminController', () => {
   describe('deleteOverride', () => {
     it('should delete an override', async () => {
       prismaService.override.findUnique.mockResolvedValue(mockOverride);
-      prismaService.override.delete.mockResolvedValue(mockOverride);
+      prismaService.override.update.mockResolvedValue({
+        ...mockOverride,
+        deletedAt: new Date(),
+      });
 
       await controller.deleteOverride(1);
 
       expect(prismaService.override.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(prismaService.override.delete).toHaveBeenCalledWith({
+      expect(prismaService.override.update).toHaveBeenCalledWith({
         where: { id: 1 },
+        data: { deletedAt: expect.any(Date) },
       });
     });
 
@@ -228,12 +236,15 @@ describe('AdminController', () => {
   });
 
   describe('clearAllOverrides', () => {
-    it('should delete all overrides', async () => {
-      prismaService.override.deleteMany.mockResolvedValue({ count: 5 });
+    it('should soft-delete all active overrides', async () => {
+      prismaService.override.updateMany.mockResolvedValue({ count: 5 });
 
       await controller.clearAllOverrides();
 
-      expect(prismaService.override.deleteMany).toHaveBeenCalled();
+      expect(prismaService.override.updateMany).toHaveBeenCalledWith({
+        where: { deletedAt: null },
+        data: { deletedAt: expect.any(Date) },
+      });
     });
   });
 });

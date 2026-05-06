@@ -5,12 +5,15 @@ import { ScheduleBuilderService } from './schedule-builder.service';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
 import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
 
 describe('ScheduleBuilderService', () => {
   let service: ScheduleBuilderService;
   let adhanAdapter: jest.Mocked<AdhanAdapter>;
   let rulesService: jest.Mocked<RulesService>;
   let overrideService: jest.Mocked<OverrideService>;
+  let qiyamConfigService: jest.Mocked<QiyamConfigService>;
 
   beforeEach(async () => {
     const mockAdhanAdapter = {
@@ -30,13 +33,26 @@ describe('ScheduleBuilderService', () => {
       get: jest.fn().mockReturnValue('America/Vancouver'),
     };
 
+    // Mock PrismaService — return empty SpecialPrayer list by default
+    const mockPrismaService = {
+      specialPrayer: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const mockQiyamConfigService = {
+      getForYear: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduleBuilderService,
         { provide: AdhanAdapter, useValue: mockAdhanAdapter },
         { provide: RulesService, useValue: mockRulesService },
         { provide: OverrideService, useValue: mockOverrideService },
+        { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: QiyamConfigService, useValue: mockQiyamConfigService },
       ],
     }).compile();
 
@@ -44,6 +60,7 @@ describe('ScheduleBuilderService', () => {
     adhanAdapter = module.get(AdhanAdapter);
     rulesService = module.get(RulesService);
     overrideService = module.get(OverrideService);
+    qiyamConfigService = module.get(QiyamConfigService);
   });
 
   it('should be defined', () => {
@@ -218,8 +235,11 @@ describe('ScheduleBuilderService', () => {
         id: 1,
         date: '2026-06-01',
         prayer: 'fajr',
-        type: 'FIXED',
+        overrideType: 'FIXED',
         value: '04:30',
+        startDate: new Date('2026-06-01'),
+        endDate: new Date('2026-06-01'),
+        deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -320,6 +340,123 @@ describe('ScheduleBuilderService', () => {
     });
   });
 
+  /**
+   * Helper to set up standard mocks for a month build.
+   * Returns a function that sets up the mocks for a given yearMonth.
+   */
+  function setupStandardMocks(yearMonth: string) {
+    const tz = 'America/Vancouver';
+    adhanAdapter.getPrayerTimes.mockReturnValue({
+      fajr: dayjs.tz(`${yearMonth}-01 04:00`, tz),
+      sunrise: dayjs.tz(`${yearMonth}-01 06:00`, tz),
+      dhuhr: dayjs.tz(`${yearMonth}-01 13:00`, tz),
+      asr: dayjs.tz(`${yearMonth}-01 16:30`, tz),
+      maghrib: dayjs.tz(`${yearMonth}-01 19:30`, tz),
+      isha: dayjs.tz(`${yearMonth}-01 21:00`, tz),
+    });
+    rulesService.computeIqama.mockReturnValue({
+      fajr: '04:15',
+      dhuhr: '13:15',
+      asr: '16:45',
+      maghrib: '19:35',
+      isha: '21:15',
+    });
+    overrideService.getOverridesForDate.mockResolvedValue([]);
+    overrideService.applyOverrides.mockReturnValue({
+      iqamaTimes: {
+        fajr: '04:15',
+        dhuhr: '13:15',
+        asr: '16:45',
+        maghrib: '19:35',
+        isha: '21:15',
+      },
+      hasOverrides: false,
+    });
+  }
+
+  describe('qiyam_time injection', () => {
+    // Ramadan 1447 dates (from dayjs-hijri):
+    // 2026-03-08 = Hijri 1447/9/19  (day before qualifying range)
+    // 2026-03-09 = Hijri 1447/9/20  (first qualifying day)
+    // 2026-03-18 = Hijri 1447/9/29  (last qualifying day)
+    // 2026-03-19 = Hijri 1447/9/30  (day after qualifying range)
+    // Month 2026-03 starts at Hijri 1447/9/12
+
+    it('should inject qiyam_time on Hijri days 20–29 of month 9 when config exists', async () => {
+      const yearMonth = '2026-03'; // Contains Ramadan 1447 days 12–30
+      setupStandardMocks(yearMonth);
+      qiyamConfigService.getForYear.mockResolvedValue({
+        hijri_year: 1447,
+        start_time: '02:00',
+      });
+
+      const schedules = await service.buildMonth(yearMonth);
+
+      // 2026-03-09 is Hijri 1447/9/20 — index 8 (day 9 of March)
+      // 2026-03-18 is Hijri 1447/9/29 — index 17 (day 18 of March)
+      for (let day = 9; day <= 18; day++) {
+        const idx = day - 1;
+        expect(schedules[idx].qiyam_time).toBe('02:00');
+      }
+    });
+
+    it('should NOT inject qiyam_time on Hijri day 19 of month 9', async () => {
+      const yearMonth = '2026-03';
+      setupStandardMocks(yearMonth);
+      qiyamConfigService.getForYear.mockResolvedValue({
+        hijri_year: 1447,
+        start_time: '02:00',
+      });
+
+      const schedules = await service.buildMonth(yearMonth);
+
+      // 2026-03-08 is Hijri 1447/9/19 — index 7 (day 8 of March)
+      expect(schedules[7].qiyam_time).toBeUndefined();
+    });
+
+    it('should NOT inject qiyam_time on Hijri day 30 of month 9', async () => {
+      const yearMonth = '2026-03';
+      setupStandardMocks(yearMonth);
+      qiyamConfigService.getForYear.mockResolvedValue({
+        hijri_year: 1447,
+        start_time: '02:00',
+      });
+
+      const schedules = await service.buildMonth(yearMonth);
+
+      // 2026-03-19 is Hijri 1447/9/30 — index 18 (day 19 of March)
+      expect(schedules[18].qiyam_time).toBeUndefined();
+    });
+
+    it('should NOT inject qiyam_time on any day of a non-Ramadan month', async () => {
+      // 2026-06 is Hijri month 12 (Dhul-Hijjah) — not Ramadan
+      const yearMonth = '2026-06';
+      setupStandardMocks(yearMonth);
+      qiyamConfigService.getForYear.mockResolvedValue({
+        hijri_year: 1447,
+        start_time: '02:00',
+      });
+
+      const schedules = await service.buildMonth(yearMonth);
+
+      for (const schedule of schedules) {
+        expect(schedule.qiyam_time).toBeUndefined();
+      }
+    });
+
+    it('should NOT inject qiyam_time when no QiyamConfig exists', async () => {
+      const yearMonth = '2026-03';
+      setupStandardMocks(yearMonth);
+      qiyamConfigService.getForYear.mockResolvedValue(null);
+
+      const schedules = await service.buildMonth(yearMonth);
+
+      for (const schedule of schedules) {
+        expect(schedule.qiyam_time).toBeUndefined();
+      }
+    });
+  });
+
   describe('getMonth', () => {
     it('should call buildMonth and return schedules', async () => {
       const yearMonth = '2026-06';
@@ -336,7 +473,7 @@ describe('ScheduleBuilderService', () => {
           maghrib: { azan: '21:00', iqama: '21:05' },
           isha: { azan: '22:45', iqama: '23:00' },
           metadata: {
-            calculation_method: 'ISNA',
+            calculation_method: 'ISNA' as const,
             has_overrides: false,
           },
         },

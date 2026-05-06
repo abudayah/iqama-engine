@@ -14,6 +14,10 @@ export interface DailySchedule {
   asr: PrayerEntry;
   maghrib: PrayerEntry;
   isha: PrayerEntry;
+  /** Eid prayer times injected when the date is an Eid day */
+  eid_prayer_1?: string; // HH:mm — 1st Eid prayer
+  eid_prayer_2?: string; // HH:mm — 2nd Eid prayer
+  qiyam_time?: string; // HH:mm
   metadata: {
     calculation_method: 'ISNA';
     has_overrides: boolean;

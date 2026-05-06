@@ -4,6 +4,7 @@ import { AdhanModule } from '../adhan/adhan.module';
 import { RulesModule } from '../rules/rules.module';
 import { OverrideModule } from '../override/override.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
 import { ScheduleBuilderService } from './schedule-builder.service';
 
 @Module({
@@ -14,7 +15,7 @@ import { ScheduleBuilderService } from './schedule-builder.service';
     OverrideModule,
     PrismaModule,
   ],
-  providers: [ScheduleBuilderService],
+  providers: [ScheduleBuilderService, QiyamConfigService],
   exports: [ScheduleBuilderService],
 })
 export class ScheduleBuilderModule {}

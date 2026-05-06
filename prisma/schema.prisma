@@ -18,3 +18,35 @@ model Override {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime? // soft delete — null means active
 }
+
+model CalendarOverride {
+  id                 Int      @id @default(autoincrement())
+  hijri_year         Int
+  hijri_month        Int      // 1–12
+  length             Int      // 29 or 30
+  is_manual_override Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([hijri_year, hijri_month])
+}
+
+model SpecialPrayer {
+  id         Int      @id @default(autoincrement())
+  type       String   // "EID_AL_FITR" | "EID_AL_ADHA"
+  hijri_year Int
+  date       String   // YYYY-MM-DD Gregorian date
+  prayers    Json     // Array of { label: string, time: string }
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([hijri_year, type])
+}
+
+model QiyamConfig {
+  id         Int      @id @default(autoincrement())
+  hijri_year Int      @unique
+  start_time String   // HH:mm
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

@@ -25,7 +25,6 @@ describe('OverrideService', () => {
     }).compile();
 
     service = module.get<OverrideService>(OverrideService);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -47,6 +46,7 @@ describe('OverrideService', () => {
         where: {
           startDate: { lte: new Date('2025-06-15T00:00:00.000Z') },
           endDate: { gte: new Date('2025-06-15T00:00:00.000Z') },
+          deletedAt: null,
         },
       });
     });
@@ -105,6 +105,9 @@ describe('OverrideService', () => {
           prayer: 'fajr',
           overrideType: 'FIXED' as const,
           value: '04:30',
+          startDate: new Date('2025-06-15'),
+          endDate: new Date('2025-06-15'),
+          deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -129,6 +132,9 @@ describe('OverrideService', () => {
           prayer: 'fajr',
           overrideType: 'OFFSET' as const,
           value: '30', // 30 minutes after Azan
+          startDate: new Date('2025-06-15'),
+          endDate: new Date('2025-06-15'),
+          deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -153,6 +159,9 @@ describe('OverrideService', () => {
           prayer: 'fajr',
           overrideType: 'FIXED' as const,
           value: '04:30',
+          startDate: new Date('2025-06-15'),
+          endDate: new Date('2025-06-15'),
+          deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -162,6 +171,9 @@ describe('OverrideService', () => {
           prayer: 'dhuhr',
           overrideType: 'FIXED' as const,
           value: '14:00',
+          startDate: new Date('2025-06-15'),
+          endDate: new Date('2025-06-15'),
+          deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -189,6 +201,9 @@ describe('OverrideService', () => {
           prayer: 'fajr',
           overrideType: 'FIXED' as const,
           value: '03:00', // Before Azan (03:30)
+          startDate: new Date('2025-06-15'),
+          endDate: new Date('2025-06-15'),
+          deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -210,8 +225,11 @@ describe('OverrideService', () => {
           id: 1,
           date: '2025-06-15',
           prayer: 'invalid_prayer',
-          type: 'FIXED' as const,
+          overrideType: 'FIXED' as const,
           value: '04:30',
+          startDate: new Date('2025-06-15'),
+          endDate: new Date('2025-06-15'),
+          deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },

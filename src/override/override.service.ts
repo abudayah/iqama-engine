@@ -50,6 +50,8 @@ export class OverrideService {
 
     for (const override of overrides) {
       const prayer = override.prayer as keyof IqamaTimes;
+      // Skip overrides for unrecognised prayer names
+      if (!(prayer in result)) continue;
       if (override.overrideType === 'FIXED') {
         result[prayer] = override.value;
         hasOverrides = true;
