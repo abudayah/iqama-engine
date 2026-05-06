@@ -132,6 +132,11 @@ Rules balance religious requirements with practical concerns:
 4. If override exists, it's used instead of calculation
 5. Critical rule: Iqama can never be earlier than Azan
 
+**Override types**:
+
+- **FIXED** — sets Iqama to an exact HH:mm time
+- **OFFSET** — shifts Iqama by ±N minutes relative to Azan (range: -120 to +120, step 5). Negative offsets are supported in the UI but the backend still enforces Iqama ≥ Azan.
+
 **Priority**: Override → Calculation Rule → Azan (minimum)
 
 ## When to Modify Rules
