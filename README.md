@@ -5,8 +5,6 @@ A NestJS-based REST API service that calculates Islamic prayer congregation time
 ## 📚 Documentation
 
 - **[Prayer Times Calculation Guide](PRAYER_TIMES_GUIDE.md)** - Complete explanation of Azan and Iqama calculations
-- **[Validation Results](VALIDATION.md)** - How to validate prayer times against reference data
-- **[Analysis Results](ANALYSIS_RESULTS.md)** - Detailed accuracy analysis and recommendations
 
 ## Overview
 
@@ -223,7 +221,7 @@ X-API-Key: your-admin-api-key
 1. **Clone the repository**
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/abudayah/iqama-engine.git
 cd iqama-engine
 ```
 
@@ -453,7 +451,7 @@ npm run format
 
 ## License
 
-UNLICENSED - Private project
+MIT
 
 ## Support
 
@@ -461,4 +459,4 @@ For questions or issues, please contact the development team.
 
 ---
 
-Built with [NestJS](https://nestjs.com/) • Powered by [Adhan](https://github.com/batoulapps/adhan-js)
+Built with [NestJS](https://nestjs.com/) • Powered by [Adhan](https://github.com/batoulapps/adhan-js) • UI: [iqama-ui](https://github.com/abudayah/iqama-ui)
