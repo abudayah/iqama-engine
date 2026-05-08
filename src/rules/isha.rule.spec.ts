@@ -11,12 +11,12 @@ describe('Isha Rule', () => {
       expect(result).toBe('18:30');
     });
 
-    it('should use 5-minute gap when Isha Azan is after 10:30 PM', () => {
-      const ishaAzan = dayjs.tz('2025-06-21 23:50', 'America/Vancouver');
+    it('should use 5-minute gap when Isha Azan is after 10:00 PM', () => {
+      const ishaAzan = dayjs.tz('2025-06-21 23:16', 'America/Vancouver');
       const result = computeIshaIqama(ishaAzan);
 
-      // 23:50 + 5 min = 23:55
-      expect(result).toBe('23:55');
+      // 23:16 + 5 min = 23:21 → floor = 23:20 (gap 4 min ✓)
+      expect(result).toBe('23:20');
     });
 
     it('should scale gap between 15-5 minutes for times between 8 PM and 10:30 PM', () => {
@@ -34,12 +34,21 @@ describe('Isha Rule', () => {
       expect(resultMinutes).toBeLessThanOrEqual(maxMinutes);
     });
 
-    it('should round up to nearest 5 minutes', () => {
+    it('should floor down to nearest 5 minutes (prefer earlier time)', () => {
       const ishaAzan = dayjs.tz('2025-12-15 18:32', 'America/Vancouver');
       const result = computeIshaIqama(ishaAzan);
 
-      // 18:32 + 15 = 18:47, rounded to 18:50
-      expect(result).toBe('18:50');
+      // 18:32 + 15 = 18:47 → FloorToNearest5 = 18:45
+      // 18:45 >= 18:32 + 4min (18:36) ✓ — floor is valid
+      expect(result).toBe('18:45');
+    });
+
+    it('should fall back to ceiling when flooring would breach the 3-minute minimum', () => {
+      // Azan 23:58 + 5 = 00:03 → floor = 00:00
+      // 00:00 < 23:58 + 3min (00:01) → floor breaches minimum → ceiling = 00:05
+      const ishaAzan = dayjs.tz('2025-06-21 23:58', 'America/Vancouver');
+      const result = computeIshaIqama(ishaAzan);
+      expect(result).toBe('00:05');
     });
 
     it('should handle Isha exactly at 8 PM boundary', () => {
@@ -50,19 +59,18 @@ describe('Isha Rule', () => {
       expect(result).toBe('20:15');
     });
 
-    it('should handle Isha exactly at 10:30 PM boundary', () => {
-      const ishaAzan = dayjs.tz('2025-06-15 22:30', 'America/Vancouver');
+    it('should handle Isha exactly at 10:00 PM boundary', () => {
+      const ishaAzan = dayjs.tz('2025-06-15 22:00', 'America/Vancouver');
       const result = computeIshaIqama(ishaAzan);
 
-      // At boundary, should use 5 minutes
-      expect(result).toBe('22:35');
+      // At 22:00 boundary, gap = 5 min → 22:05 → floor = 22:05 (gap 5 min ✓)
+      expect(result).toBe('22:05');
     });
 
     it('should handle times crossing midnight', () => {
+      // Azan 23:58 + 5 = 00:03 → floor = 00:00, min = 00:01 → ceiling = 00:05
       const ishaAzan = dayjs.tz('2025-06-21 23:58', 'America/Vancouver');
       const result = computeIshaIqama(ishaAzan);
-
-      // 23:58 + 5 = 00:03, rounded to 00:05
       expect(result).toBe('00:05');
     });
   });

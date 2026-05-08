@@ -122,7 +122,9 @@ Each prayer has its own rule file in `src/rules/`:
 
 ### Isha (FR5) - Seasonal Scaling
 
-**Calculation**: Delay scales from 15 min (summer) to 90 min (winter) based on Maghrib time, then CeilingToNearest5.
+**Calculation**: Delay scales from 15 min (winter, Azan < 20:00) to 5 min (summer, Azan > 22:00) via linear interpolation over the 20:00→22:00 window, then rounded to the nearest 5-minute boundary.
+
+**Rounding (P3)**: FloorToNearest5 is preferred to bring a late summer Isha time earlier. Falls back to CeilingToNearest5 only if flooring would leave less than 4 minutes after Azan (P0 minimum gap).
 
 ## Key Principles
 
@@ -259,6 +261,16 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 4. **Admin overrides also rounded and P0-capped** — FIXED and OFFSET overrides for Fajr now go through CeilingToNearest5 (P3) and the P0 re-cap, same as the calculation path.
 
 - Implemented in `fajr.rule.ts` (`computeFajrIqama`, `computeWeeklyFajrIqama`) and `override.service.ts` (`applyOverrides`)
+
+### Isha Rounding Changed to FloorToNearest5
+
+**Change**: Isha Iqama now prefers `FloorToNearest5` instead of `CeilingToNearest5`.
+
+- **Reason**: In summer (Jun–Jul), Isha Azan is already late (~23:08–23:17). Rounding down brings the Iqama to the earliest clean 5-min boundary, making it more convenient for the congregation.
+- **P0 safety net**: If flooring would leave less than 4 minutes between Azan and Iqama, the system falls back to `CeilingToNearest5`.
+- **Example**: Azan `23:16` + 5 min gap = `23:21` → floor = `23:20` (gap 4 min ✓). Old behaviour: `23:25`.
+- **Winter unaffected**: In winter, Isha Azan is early (~18:00) with a 15-min gap, so floor and ceiling produce the same or very similar results.
+- Implemented in `isha.rule.ts` (`computeIshaIqama`)
 
 ### High Latitude Rule Added (TwilightAngle)
 

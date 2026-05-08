@@ -180,12 +180,18 @@ Isha Iqama uses the same **weekly fixed time** approach as Fajr (FR4-W). The sys
 **Per-day formula (FR4)**:
 
 ```
-If Isha Azan > 10:30 PM:  gap = 5 minutes
+If Isha Azan > 10:00 PM:  gap = 5 minutes
 If Isha Azan < 8:00 PM:   gap = 15 minutes
 Otherwise:                gap = linear interpolation between 15 and 5 minutes
-                               over the 8:00 PM → 10:30 PM range
-Daily candidate = Round up to nearest 5 minutes (Azan + gap)
+                               over the 8:00 PM → 10:00 PM range (120-minute window)
+
+P3 rounding (prefer earlier time):
+  candidate = FloorToNearest5(Azan + gap)
+  If candidate < Azan + 4 min (P0 minimum):
+      candidate = CeilingToNearest5(Azan + gap)
 ```
+
+Flooring is preferred so that a late Isha Azan (summer months) results in the earliest clean 5-minute boundary, making it more convenient for the congregation. The 4-minute P0 minimum is the safety net that prevents flooring from getting too close to Azan.
 
 **Weekly rule (FR4-W)**:
 

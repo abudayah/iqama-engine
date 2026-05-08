@@ -1,13 +1,19 @@
 import { Dayjs } from 'dayjs';
-import { ceilingToNearest5, formatHHmm } from './time-utils';
+import { ceilingToNearest5, floorToNearest5, formatHHmm } from './time-utils';
 
 /**
  * Isha Iqama Calculation (FR4)
  *
- * if Azan > 22:30:  gap = 5
- * if Azan < 20:00:  gap = 15
- * else:             gap = 15 - 10 * (minutesSince20:00) / 150  (linear interpolation)
- * Iqama = CeilingToNearest5(Azan + gap)
+ * Gap calculation (based on Azan time):
+ *   if Azan > 22:00:  gap = 5
+ *   if Azan < 20:00:  gap = 15
+ *   else:             gap = 15 - 10 * (minutesSince20:00) / 120  (linear interpolation over 20:00→22:00)
+ *
+ * Rounding (P3):
+ *   Prefer FloorToNearest5(Azan + gap) to bring the time earlier when Isha is late
+ *   (convenience for the congregation in summer months).
+ *   Fall back to CeilingToNearest5 only when flooring would leave less than 3 minutes
+ *   after Azan (practical minimum for a very late summer Isha).
  */
 export function computeIshaIqama(ishaAzan: Dayjs): string {
   // Strip seconds from Azan time for clean minute-based calculations
@@ -17,21 +23,33 @@ export function computeIshaIqama(ishaAzan: Dayjs): string {
   const minute = ishaAzanClean.minute();
   const totalMinutes = hour * 60 + minute;
 
-  const boundary2230 = 22 * 60 + 30; // 1350
+  const boundary2200 = 22 * 60; // 1320
   const boundary2000 = 20 * 60; // 1200
 
   let gap: number;
-  if (totalMinutes > boundary2230) {
+  if (totalMinutes > boundary2200) {
     gap = 5;
   } else if (totalMinutes < boundary2000) {
     gap = 15;
   } else {
+    // Linear interpolation: 15 min at 20:00 → 5 min at 22:00 (120-minute window)
     const minutesSince2000 = totalMinutes - boundary2000;
-    gap = 15 - 10 * (minutesSince2000 / 150);
+    gap = 15 - 10 * (minutesSince2000 / 120);
   }
 
   const roundedGap = Math.round(gap);
-  const result = ceilingToNearest5(ishaAzanClean.add(roundedGap, 'minute'));
+  const target = ishaAzanClean.add(roundedGap, 'minute');
+
+  // P3: prefer flooring to bring a late Isha time earlier (summer convenience).
+  // Use a 3-minute minimum for the floor check — when Isha is already very late
+  // (e.g. 23:17), the difference between 23:20 (+3m) and 23:25 (+8m) matters
+  // more to the congregation than the strict 4-minute P0 boundary.
+  // Fall back to CeilingToNearest5 only if even 3 minutes can't be maintained.
+  const minIqama = ishaAzanClean.add(3, 'minute');
+  const floored = floorToNearest5(target);
+  const result = floored.isBefore(minIqama)
+    ? ceilingToNearest5(target)
+    : floored;
 
   return formatHHmm(result);
 }
