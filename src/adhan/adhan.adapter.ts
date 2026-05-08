@@ -36,6 +36,7 @@ export class AdhanAdapter {
 
     const params = CalculationMethod.NorthAmerica();
     params.madhab = Madhab.Shafi;
+    // params.ishaAngle = 12;
     params.rounding = Rounding.None;
 
     const pt = new PrayerTimes(coordinates, date, params);
