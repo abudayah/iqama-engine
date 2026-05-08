@@ -13,6 +13,7 @@ This document explains the Islamic prayer time (Iqama) calculation rules used in
 - **Iqama**: The congregation start time (when the prayer actually begins)
 - **DST**: Daylight Saving Time
 - **CeilingToNearest5**: Round up to the nearest 5-minute boundary (e.g., 20:31 → 20:35)
+- **FloorToNearest5**: Round down to the nearest 5-minute boundary (e.g., 04:39 → 04:35). Used when rounding up would breach a P0 safety ceiling.
 - **CeilingToNearest30**: Round up to the nearest 30-minute boundary (e.g., 15:20 → 15:30, 15:35 → 16:00)
 
 ## The Five Prayers
@@ -35,33 +36,67 @@ Each prayer has its own rule file in `src/rules/`:
 - `maghrib.rule.ts` — Maghrib calculation (FR1) - Simple offset
 - `isha.rule.ts` — Isha calculation (FR5) - Seasonal scaling
 
+## Rule Priority Guide
+
+- P0: Safety & Shariah Constraints – Highest priority. These are non-negotiable boundaries.
+  - Example: Iqama must be at least 4 minutes after Azan.
+
+  - Example: Iqama must not exceed 75 minutes after Azan.
+
+  - Example: Fajr Iqama must never overlap with Sunrise (enforced via Safe_Sunrise_Limit = Sunrise - 60 min).
+
+- P1: Admin Overrides – Manual intervention. Direct overrides set by an admin for specific dates (e.g., Ramadan or special events) override the standard automated calculations.
+
+- P2: Seasonal & Calendar Rules – Primary Logic. These are the specific prayer rules (FR1–FR5) that dictate how a prayer behaves based on the date (e.g., Asr seasonal fixed times or Dhuhr DST adjustments).
+
+- P3: Formatting & Rounding – User Experience. Constraints like CeilingToNearest5 ensure the times are "clean" for the congregation. This is applied after the primary time is determined but must still respect P0.
+
+- P4: Default Fallbacks – The Safety Net. If a calculation fails or a specific seasonal rule isn't found, the system falls back to a safe default (e.g., Azan + 10 minutes).
+
+- P5: UI/UX Enhancements – Presentation only. Lowest priority; affects how the time is labeled or displayed (e.g., renaming "Dhuhr" to "Friday"), but does not change the underlying time logic.
+
+## General prayer rules
+
+- P0: Iqama must be after azan at least by 4 minutes.
+- P0: Max_Delay between azan and Iqama = Azan + 75 min.
+
 ## Detailed Rule Descriptions
 
 ### Fajr (FR3) - Dynamic with Override Support
 
 **Calculation**:
 
-- Max_Delay = Azan + 75 min
-- Safe_Sunrise_Limit = Sunrise - 60 min
-- Base_Target = min(Max_Delay, Safe_Sunrise_Limit)
-- If Base_Target < Azan + 10 min: Base_Target = Azan + 10 min
-- Iqama = CeilingToNearest5(Base_Target)
+- P0: Safe_Sunrise_Limit = Sunrise - 60 min (safety boundary — Iqama must never encroach on sunrise)
+- P1: Admin Overrides — applied instead of FR3 calculation; still rounded (P3) and capped to P0.
+- P2: Base_Target = min(Max_Delay, Safe_Sunrise_Limit)
+- P2: If Base_Target < Azan + 10 min: Base_Target = Azan + 10 min (floor clamp, itself capped to P0)
+- P3: Iqama = CeilingToNearest5(Base_Target)
+  - If rounding up would breach Safe_Sunrise_Limit → FloorToNearest5(Safe_Sunrise_Limit) instead
+  - Result is always a clean 5-minute boundary; P0 is never breached
 
-**Admin Overrides**: Use overrides for fixed times during special periods (Ramadan, summer months).
+**Weekly rule (FR3-W)**:
+
+- Compute the per-day FR3 result for each day in the Friday→Thursday window.
+- Take the **latest** per-day result as the candidate weekly time.
+- Cap the candidate against the **minimum** Safe_Sunrise_Limit across all 7 days (string comparison on HH:mm).
+  - If the cap lands on a non-5-min boundary → FloorToNearest5 of that limit.
+  - This guarantees P0 is respected for every day in the week, not just the day with the latest sunrise.
+
+**Admin Overrides**: Use overrides for fixed times during special periods (Ramadan, summer months). All override values are rounded (P3) and capped to P0 before being applied.
 
 ### Dhuhr (FR2) - Fixed by DST, Friday Jumu'ah adjustment
 
 **Calculation**:
 
-- DST (Daylight Saving Time): 1:45 PM
-- Standard Time: 12:45 PM
+- P1: DST (Daylight Saving Time): 1:45 PM
+- P1: Standard Time: 12:45 PM
 
 **Friday (Jumu'ah) rule**:
 
 - The iqama column shows the **Khutbah start time**, which is 5 minutes before the actual prayer
-- DST Friday: 1:40 PM (`13:45 - 5 min`)
-- Standard Time Friday: 12:40 PM (`12:45 - 5 min`)
-- The UI renames the row label from "Dhuhr" to **"Friday"** on Fridays
+- P1: DST Friday: 1:40 PM (`13:45 - 5 min`)
+- P1: Standard Time Friday: 12:40 PM (`12:45 - 5 min`)
+- P2: The UI renames the row label from "Dhuhr" to **"Friday"** on Fridays
 
 ### Asr (FR4) - Seasonal Fixed Times
 
@@ -76,7 +111,7 @@ Each prayer has its own rule file in `src/rules/`:
 
 ### Maghrib (FR1) - Simple Offset
 
-**Calculation**: Iqama = CeilingToNearest5(Azan + 5 min)
+**Calculation**: P0: Iqama = CeilingToNearest5(Azan + 5 min)
 
 ### Isha (FR5) - Seasonal Scaling
 
@@ -206,11 +241,17 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 
 ### Fajr Rule Enhanced
 
-**Change**: Added documentation for admin override usage
+**Changes**:
 
-- Dynamic calculation remains as default
-- Overrides recommended for special periods
-- Provides flexibility while maintaining sunrise protection
+1. **P0 strictly enforced at every step** — Safe_Sunrise_Limit (Sunrise - 60 min) is now the hard ceiling applied after the floor clamp, after CeilingToNearest5 rounding, and after admin overrides. No step can breach it.
+
+2. **FloorToNearest5 on P0 breach** — When CeilingToNearest5 would push the result past Safe_Sunrise_Limit, the system floors down to the nearest 5-minute boundary instead of clamping to the raw limit minute. Result is always a clean 5-min boundary.
+
+3. **Weekly cap uses minimum safeLimit across all 7 days** — The weekly fixed time is capped against the smallest Safe_Sunrise_Limit string across the entire Friday→Thursday window (not just the day with the earliest sunrise Dayjs object). This prevents a day mid-week with an early sunrise from being silently breached by a weekly time derived from a day with a later sunrise.
+
+4. **Admin overrides also rounded and P0-capped** — FIXED and OFFSET overrides for Fajr now go through CeilingToNearest5 (P3) and the P0 re-cap, same as the calculation path.
+
+- Implemented in `fajr.rule.ts` (`computeFajrIqama`, `computeWeeklyFajrIqama`) and `override.service.ts` (`applyOverrides`)
 
 ### Hijri Calendar Module Added
 

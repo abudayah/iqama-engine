@@ -63,7 +63,29 @@ describe('computeWeeklyFajrIqama (FR3-W)', () => {
     const result = computeWeeklyFajrIqama(week);
 
     // Latest per-day iqama is 04:10 (Mon–Thu)
-    expect(result).toBe('04:10');
+    // Earliest safeSunriseLimit is 04:03 (Fri) → floor to nearest 5 → 04:00
+    expect(result).toBe('04:00');
+  });
+
+  it('caps weekly result to earliest safeSunriseLimit (P0) — the reported bug', () => {
+    // Reproduces: Fajr 03:30, Sunrise 05:29 → safeSunriseLimit 04:29
+    // Another day in the week has a later sunrise, producing a per-day iqama of 04:37
+    // The weekly result must be capped to 04:29 (earliest safe limit), not 04:37
+    const week: WeeklyFajrEntry[] = [
+      entry('2025-06-20', '03:30', '05:29'), // safe=04:29, max=04:45 → per-day=04:29
+      entry('2025-06-21', '03:22', '05:45'), // safe=04:45, max=04:37 → per-day=04:37
+      entry('2025-06-22', '03:24', '05:44'), // safe=04:44, max=04:39 → per-day=04:39
+      entry('2025-06-23', '03:25', '05:43'), // safe=04:43, max=04:40 → per-day=04:40
+      entry('2025-06-24', '03:26', '05:42'), // safe=04:42, max=04:41 → per-day=04:41
+      entry('2025-06-25', '03:27', '05:41'), // safe=04:41, max=04:42 → per-day=04:41
+      entry('2025-06-26', '03:28', '05:40'), // safe=04:40, max=04:43 → per-day=04:40
+    ];
+
+    const result = computeWeeklyFajrIqama(week);
+
+    // Latest per-day = 04:41, but earliest safeSunriseLimit = 04:29 (day 1)
+    // P0 wins → floor to nearest 5 → 04:25
+    expect(result).toBe('04:25');
   });
 
   it('throws when given an empty array', () => {

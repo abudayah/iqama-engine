@@ -53,26 +53,36 @@ Fajr Iqama uses a **weekly fixed time** (FR3-W). Rather than changing every day,
 **Per-day formula (FR3)**:
 
 ```
-Max_Delay          = Azan + 75 minutes
-Safe_Sunrise_Limit = Sunrise - 60 minutes
-Base_Target        = minimum of (Max_Delay, Safe_Sunrise_Limit)
-If Base_Target < Azan + 10 minutes: Base_Target = Azan + 10 minutes
-Daily candidate    = Round up to nearest 5 minutes
+P0: Safe_Sunrise_Limit = Sunrise - 60 minutes  ← hard ceiling, never exceeded
+P2: Max_Delay          = Azan + 75 minutes
+P2: Base_Target        = minimum of (Max_Delay, Safe_Sunrise_Limit)
+P2: If Base_Target < Azan + 10 minutes: Base_Target = Azan + 10 minutes
+    (floor clamp is itself capped to Safe_Sunrise_Limit so P0 always wins)
+P3: Daily candidate    = CeilingToNearest5(Base_Target)
+    If rounding up would breach Safe_Sunrise_Limit:
+        Daily candidate = FloorToNearest5(Safe_Sunrise_Limit)
 ```
 
 **Weekly rule (FR3-W)**:
 
 ```
-Weekly Iqama = latest daily candidate across Friday → Thursday
+1. Compute the per-day FR3 result for each day in the window
+2. Weekly candidate = latest per-day result
+3. Min_Safe_Limit   = minimum Safe_Sunrise_Limit across all 7 days
+4. If Weekly candidate > Min_Safe_Limit:
+       Weekly Iqama = FloorToNearest5(Min_Safe_Limit)
+   Else:
+       Weekly Iqama = Weekly candidate
 ```
 
-Taking the latest candidate ensures the chosen time is safe for every day in the week — no day's Iqama will fall too close to sunrise.
+Taking the latest candidate ensures the chosen time is safe for every day in the week. Capping against the **minimum** safe limit (not just the day with the latest sunrise) guarantees P0 is respected for every single day in the window — including days mid-week where sunrise arrives earlier.
 
 **Why weekly?**
 
 - Congregation can be told one fixed time for the whole week
 - Eliminates daily changes that cause confusion
-- Still respects the sunrise safety buffer every day
+- Respects the sunrise safety buffer for **every day** in the window — the weekly time is capped against the most restrictive day, not just the day with the latest sunrise
+- Result is always a clean 5-minute boundary (CeilingToNearest5, or FloorToNearest5 when the ceiling is the binding constraint)
 - Consistent with how the masjid announces times on a weekly basis
 
 **Admin Overrides**:
@@ -210,14 +220,17 @@ Admins can set specific prayer times for specific date ranges that override the 
 1. Admin creates an override via the API
 2. Override is stored in the database
 3. When calculating prayer times, the system applies overrides after the rule calculation
-4. If a FIXED override exists, it replaces the rule result entirely
-5. If an OFFSET override exists, it shifts the rule result by ±N minutes relative to Azan
+4. If a FIXED override exists, it replaces the rule result — then rounded (P3) and P0-capped
+5. If an OFFSET override exists, it shifts the Azan by ±N minutes — then rounded (P3) and P0-capped
+6. For Fajr specifically: if rounding up would breach Safe_Sunrise_Limit, the result is floored down to the nearest 5-minute boundary instead
 
 ### Override Priority
 
 ```
 Override (if exists) → Calculation Rule → Azan (minimum fallback)
 ```
+
+**P0 always wins**: Even admin overrides cannot push Fajr Iqama past Sunrise - 60 min. The override value is rounded and then capped to the safe limit.
 
 **Critical Rule**: Iqama can never be earlier than Azan (religiously invalid)
 

@@ -28,18 +28,18 @@ describe('Fajr Rule', () => {
       expect(result).toBe('04:05');
     });
 
-    it('should enforce minimum 10-minute delay from Azan', () => {
+    it('P0 sunrise buffer wins over the 10-minute floor clamp', () => {
       const fajrAzan = dayjs.tz('2025-06-21 04:00', 'America/Vancouver');
       const sunrise = dayjs.tz('2025-06-21 04:05', 'America/Vancouver'); // Very close sunrise
 
       const result = computeFajrIqama(fajrAzan, sunrise);
 
-      // Safe limit: 04:05 - 60 = 03:05 (before Azan!)
+      // Safe limit: 04:05 - 60 = 03:05 (before Azan — extreme edge case)
       // Max delay: 04:00 + 75 = 05:15
       // Base target: min(05:15, 03:05) = 03:05
-      // Floor clamp: 04:00 + 10 = 04:10
-      // Result: max(03:05, 04:10) = 04:10
-      expect(result).toBe('04:10');
+      // Floor clamp would push to 04:10, but P0 caps it back to 03:05
+      // P0 always wins — result = 03:05
+      expect(result).toBe('03:05');
     });
 
     it('should round up to nearest 5 minutes', () => {

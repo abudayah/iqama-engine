@@ -120,9 +120,19 @@ export class ScheduleBuilderService {
         isha: raw.isha,
       };
 
+      // Sunrise map for P0 re-cap inside applyOverrides (Fajr only)
+      const sunriseMap: Record<string, Dayjs> = {
+        fajr: raw.sunrise,
+      };
+
       // Apply overrides (FR6)
       const { iqamaTimes: finalIqama, hasOverrides } =
-        this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
+        this.overrideService.applyOverrides(
+          rawAzanMap,
+          iqamaTimes,
+          overrides,
+          sunriseMap,
+        );
 
       // (f) Build the DailySchedule object
       const dateDayjs = dayjs.tz(date, tz);
