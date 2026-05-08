@@ -1,11 +1,18 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: 'src/rules/**'
+fileMatchPattern: '{src/rules/**,src/adhan/**}'
 ---
 
 # Prayer Time Calculation Rules — Overview
 
 This document explains the Islamic prayer time (Iqama) calculation rules used in the iqama-engine. These rules transform raw astronomical prayer times (Azan) from the `adhan` library into congregation start times (Iqama) that are practical for the community.
+
+## Azan Calculation Method
+
+- **Method**: ISNA (Islamic Society of North America) — 15° for both Fajr and Isha
+- **High Latitude Rule**: `TwilightAngle` — caps Fajr and Isha in June/July when the 15° angle is unreachable at ~49.3°N. Zero effect on all other months.
+- **Madhab**: Shafi'i (for Asr)
+- **Rationale**: Aligns with IslamicFinder and FCNA guidance for Canada. See `PRAYER_TIMES_GUIDE.md` for full details.
 
 ## Glossary
 
@@ -252,6 +259,16 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 4. **Admin overrides also rounded and P0-capped** — FIXED and OFFSET overrides for Fajr now go through CeilingToNearest5 (P3) and the P0 re-cap, same as the calculation path.
 
 - Implemented in `fajr.rule.ts` (`computeFajrIqama`, `computeWeeklyFajrIqama`) and `override.service.ts` (`applyOverrides`)
+
+### High Latitude Rule Added (TwilightAngle)
+
+**Change**: Added `HighLatitudeRule.TwilightAngle` to the adhan adapter.
+
+- **Problem**: At ~49.3°N, the 15° ISNA twilight angle is unreachable in June and July. Without a rule, the library returns an astronomically impossible Isha time (e.g. 23:50 in mid-June vs IslamicFinder's 23:07).
+- **Fix**: `TwilightAngle` caps Fajr and Isha to the point where the angle is actually reachable, bringing summer Isha times within ~7–8 min of IslamicFinder.
+- **Scope**: June and July only — all other months are unaffected.
+- **Authority**: Aligns with FCNA guidance (13° for Canada) and IslamicFinder's observed behaviour.
+- Implemented in `src/adhan/adhan.adapter.ts`
 
 ### Hijri Calendar Module Added
 

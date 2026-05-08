@@ -21,7 +21,7 @@ The system calculates both times for the five daily prayers:
 
 ## Azan Calculation
 
-### Method: ISNA (Islamic Society of North America)
+### Method: ISNA + High Latitude Rule (TwilightAngle)
 
 All Azan times are calculated using the **ISNA method** with the following parameters:
 
@@ -33,6 +33,19 @@ All Azan times are calculated using the **ISNA method** with the following param
   - Fajr angle: 15° (ISNA standard)
   - Isha angle: 15° (ISNA standard)
   - Madhab: Shafi'i (for Asr calculation)
+  - High Latitude Rule: **TwilightAngle**
+
+### High Latitude Adjustment
+
+Port Coquitlam sits at ~49.3°N. In June and July the sun never dips far enough below the horizon for the 15° twilight angle to be reached, meaning the raw ISNA formula cannot produce a valid Isha (or Fajr) time. Without an adjustment the library would return an astronomically impossible time well past midnight.
+
+The **TwilightAngle** rule caps Fajr and Isha to the point where the twilight angle is actually reachable, preventing unreasonably late Isha times in summer. It has **zero effect on any other month** — times from August through May are identical to the raw 15° calculation.
+
+This matches the behaviour of IslamicFinder and aligns with the Fiqh Council of North America (FCNA) guidance, which recommends 13° year-round for Canada. In practice, 15° + TwilightAngle produces the same summer cap that a flat 13° would, while keeping the more accurate 15° calculation for the rest of the year.
+
+**Affected months**: June and July only  
+**Impact**: Isha Azan ~7–8 min earlier than raw 15° in mid-June (aligns with IslamicFinder)  
+**Source**: [FCNA calculation method guidance](https://fiqhcouncil.org/the-suggested-calculation-method-for-fajr-and-isha/)
 
 ### What This Means
 
@@ -300,7 +313,8 @@ coordinates: new Coordinates(49.2628, -122.7811);
 Update in `src/adhan/adhan.adapter.ts`:
 
 ```typescript
-params: CalculationMethod.NorthAmerica();
+params: CalculationMethod.NorthAmerica(); // 15° Fajr & Isha (ISNA)
+params.highLatitudeRule = HighLatitudeRule.TwilightAngle; // summer cap for ~49°N
 ```
 
 ### Seasonal Dates
@@ -322,7 +336,7 @@ For questions about:
 
 ## Summary
 
-✅ **Azan**: Astronomical calculations using ISNA method  
+✅ **Azan**: Astronomical calculations using ISNA method + TwilightAngle high-latitude rule  
 ✅ **Fajr & Isha**: Weekly fixed times (Friday → Thursday window) for predictability  
 ✅ **Dhuhr**: Fixed time, DST-aware, Friday Khutbah adjustment  
 ✅ **Asr**: Simplified to 4 seasonal times (easy to remember)  
