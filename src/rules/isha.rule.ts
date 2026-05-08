@@ -35,3 +35,34 @@ export function computeIshaIqama(ishaAzan: Dayjs): string {
 
   return formatHHmm(result);
 }
+
+/**
+ * Weekly Isha Iqama Calculation (FR4-W)
+ *
+ * Analyses the Isha Azan times for a Friday-to-Thursday week and returns a
+ * single fixed Iqama time that is practical for every day in that window.
+ *
+ * Strategy: apply the per-day FR4 formula to each day in the week, then take
+ * the LATEST result.  This is the most conservative choice — it guarantees
+ * that every day has an adequate gap between Azan and Iqama while avoiding
+ * unreasonably late times.
+ *
+ * The result is rounded up to the nearest 5 minutes (already done by
+ * computeIshaIqama for each day, but the max selection may land on a clean
+ * boundary anyway).
+ *
+ * @param weekDays - Array of Isha Azan times for each day in the week
+ *                   (Friday through Thursday, 7 entries).
+ * @returns HH:mm string — the fixed Isha Iqama for the whole week.
+ */
+export function computeWeeklyIshaIqama(weekDays: Dayjs[]): string {
+  if (weekDays.length === 0) {
+    throw new Error('weekDays must contain at least one entry');
+  }
+
+  // Compute the per-day iqama for each day and keep the latest (HH:mm string
+  // comparison works correctly because times are zero-padded 24-hour format).
+  return weekDays
+    .map((ishaAzan) => computeIshaIqama(ishaAzan))
+    .reduce((latest, current) => (current > latest ? current : latest));
+}

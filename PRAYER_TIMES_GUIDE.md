@@ -46,30 +46,41 @@ The system uses astronomical calculations based on the sun's position to determi
 
 Each prayer has its own rule for calculating when the congregation starts.
 
-### 1. Fajr Iqama (Dynamic)
+### 1. Fajr Iqama (Weekly Fixed)
 
-**Calculation**:
+Fajr Iqama uses a **weekly fixed time** (FR3-W). Rather than changing every day, the system analyses the full Friday-to-Thursday week and locks in a single Iqama time for all seven days.
+
+**Per-day formula (FR3)**:
 
 ```
-Max_Delay = Azan + 75 minutes
-Safe_Sunrise_Limit = Sunrise - 45 minutes
-Base_Target = minimum of (Max_Delay, Safe_Sunrise_Limit)
+Max_Delay          = Azan + 75 minutes
+Safe_Sunrise_Limit = Sunrise - 60 minutes
+Base_Target        = minimum of (Max_Delay, Safe_Sunrise_Limit)
 If Base_Target < Azan + 10 minutes: Base_Target = Azan + 10 minutes
-Iqama = Round up to nearest 5 minutes
+Daily candidate    = Round up to nearest 5 minutes
 ```
 
-**Why Dynamic?**
+**Weekly rule (FR3-W)**:
 
-- Protects against praying too close to sunrise (religiously invalid)
-- Adjusts automatically throughout the year
-- Balances sleep needs in summer with work schedules in winter
+```
+Weekly Iqama = latest daily candidate across Friday → Thursday
+```
+
+Taking the latest candidate ensures the chosen time is safe for every day in the week — no day's Iqama will fall too close to sunrise.
+
+**Why weekly?**
+
+- Congregation can be told one fixed time for the whole week
+- Eliminates daily changes that cause confusion
+- Still respects the sunrise safety buffer every day
+- Consistent with how the masjid announces times on a weekly basis
 
 **Admin Overrides**:
-For special periods (Ramadan, summer months), admins can set fixed Fajr Iqama times that override the calculation.
+For special periods (Ramadan, summer months), admins can set fixed Fajr Iqama times that override the weekly calculation entirely.
 
 ---
 
-### 2. Dhuhr Iqama (Fixed by Season)
+### 2. Dhuhr Iqama (Fixed by DST)
 
 **Calculation**:
 
@@ -96,7 +107,7 @@ The UI also renames the row from "Dhuhr" to "Friday" on Fridays.
 
 ---
 
-### 3. Asr Iqama (Seasonal Fixed Times) ⭐ NEW
+### 3. Asr Iqama (Seasonal Fixed Times)
 
 **Calculation**:
 
@@ -139,28 +150,43 @@ Iqama = Round up to nearest 5 minutes (Azan + 5 minutes)
 
 ---
 
-### 5. Isha Iqama (Seasonal Scaling)
+### 5. Isha Iqama (Weekly Fixed)
 
-**Calculation**:
+Isha Iqama uses the same **weekly fixed time** approach as Fajr (FR4-W). The system analyses the full Friday-to-Thursday week and locks in a single Iqama time for all seven days.
+
+**Per-day formula (FR4)**:
 
 ```
-If Maghrib Azan is before 7:00 PM (winter):
-  Delay = 90 minutes
-
-If Maghrib Azan is after 9:00 PM (summer):
-  Delay = 15 minutes
-
-Otherwise (spring/fall):
-  Delay = Scaled between 15-90 minutes based on Maghrib time
-
-Iqama = Round up to nearest 5 minutes (Maghrib Azan + Delay)
+If Isha Azan > 10:30 PM:  gap = 5 minutes
+If Isha Azan < 8:00 PM:   gap = 15 minutes
+Otherwise:                gap = linear interpolation between 15 and 5 minutes
+                               over the 8:00 PM → 10:30 PM range
+Daily candidate = Round up to nearest 5 minutes (Azan + gap)
 ```
 
-**Why Seasonal Scaling?**
+**Weekly rule (FR4-W)**:
 
-- Prevents unreasonably late Isha in summer (would be 11:30 PM+)
-- Provides reasonable gap in winter (allows time between prayers)
-- Automatically adjusts throughout the year
+```
+Weekly Iqama = latest daily candidate across Friday → Thursday
+```
+
+Taking the latest candidate ensures every day in the week has an adequate gap between Azan and Iqama.
+
+**Why weekly?**
+
+- Same benefits as Fajr — one announced time covers the whole week
+- Prevents the Iqama from feeling rushed on the day with the latest Isha
+- Automatically scales with the season (summer nights stay reasonable, winter nights get a proper gap)
+
+---
+
+## Weekly Window
+
+Both Fajr and Isha use a **Friday → Thursday** window. This matches the Islamic week and the typical announcement cycle at the masjid.
+
+- The window is recalculated for every day: each day looks back to the most recent Friday and forward to the following Thursday.
+- All 7 days in the window share the same Fajr and Isha Iqama time.
+- Dhuhr, Asr, and Maghrib are **not affected** — they continue to use their own per-day or seasonal rules.
 
 ---
 
@@ -168,13 +194,13 @@ Iqama = Round up to nearest 5 minutes (Maghrib Azan + Delay)
 
 ### What Are Overrides?
 
-Admins can set specific prayer times for specific dates that override the automatic calculations.
+Admins can set specific prayer times for specific date ranges that override the automatic calculations.
 
 ### When to Use Overrides
 
 **Common Use Cases**:
 
-- **Ramadan**: Fixed Fajr times for consistency during fasting month
+- **Ramadan**: Fixed Fajr times for consistency during the fasting month
 - **Summer Months**: Lock Fajr at a specific time (e.g., 4:30 AM)
 - **Special Events**: Adjust times for community events
 - **Daylight Saving Transitions**: Smooth out any abrupt changes
@@ -183,9 +209,9 @@ Admins can set specific prayer times for specific dates that override the automa
 
 1. Admin creates an override via the API
 2. Override is stored in the database
-3. When calculating prayer times, the system checks for overrides first
-4. If override exists, it's used instead of the calculation
-5. If no override, the calculation rules apply
+3. When calculating prayer times, the system applies overrides after the rule calculation
+4. If a FIXED override exists, it replaces the rule result entirely
+5. If an OFFSET override exists, it shifts the rule result by ±N minutes relative to Azan
 
 ### Override Priority
 
@@ -236,13 +262,13 @@ bash run_all_tests.sh      # Full validation suite
 
 ## Quick Reference
 
-| Prayer      | Iqama Rule                                           | Changes Per Year                   |
-| ----------- | ---------------------------------------------------- | ---------------------------------- |
-| **Fajr**    | Dynamic (Azan + 10-75 min)                           | Variable (use overrides for fixed) |
-| **Dhuhr**   | Fixed (12:45 PM / 1:45 PM); Friday: −5 min (Khutbah) | 2 (DST transitions)                |
-| **Asr**     | Seasonal Fixed                                       | 4 (seasonal)                       |
-| **Maghrib** | Azan + 5 min                                         | Daily (follows sunset)             |
-| **Isha**    | Scaled (15-90 min after Maghrib)                     | Daily (follows season)             |
+| Prayer      | Iqama Rule                                           | Changes Per Year       |
+| ----------- | ---------------------------------------------------- | ---------------------- |
+| **Fajr**    | Weekly fixed (FR3-W) — latest of Fri→Thu window      | Weekly                 |
+| **Dhuhr**   | Fixed (12:45 PM / 1:45 PM); Friday: −5 min (Khutbah) | 2 (DST transitions)    |
+| **Asr**     | Seasonal fixed                                       | 4 (seasonal)           |
+| **Maghrib** | Azan + 5 min                                         | Daily (follows sunset) |
+| **Isha**    | Weekly fixed (FR4-W) — latest of Fri→Thu window      | Weekly                 |
 
 ---
 
@@ -284,9 +310,10 @@ For questions about:
 ## Summary
 
 ✅ **Azan**: Astronomical calculations using ISNA method  
-✅ **Iqama**: Smart rules balancing accuracy and practicality  
+✅ **Fajr & Isha**: Weekly fixed times (Friday → Thursday window) for predictability  
+✅ **Dhuhr**: Fixed time, DST-aware, Friday Khutbah adjustment  
 ✅ **Asr**: Simplified to 4 seasonal times (easy to remember)  
-✅ **Fajr**: Dynamic with override support (flexible)  
+✅ **Maghrib**: Simple 5-minute offset  
 ✅ **Overrides**: Admin control for special periods  
 ✅ **Validated**: 80% of days within 5 minutes of reference data
 

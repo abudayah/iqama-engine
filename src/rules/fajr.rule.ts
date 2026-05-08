@@ -36,3 +36,39 @@ export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
 
   return formatHHmm(ceilingToNearest5(baseTarget));
 }
+
+export interface WeeklyFajrEntry {
+  fajrAzan: Dayjs;
+  sunrise: Dayjs;
+}
+
+/**
+ * Weekly Fajr Iqama Calculation (FR3-W)
+ *
+ * Analyses the Fajr Azan times for a Friday-to-Thursday week and returns a
+ * single fixed Iqama time that is safe for every day in that window.
+ *
+ * Strategy: apply the per-day FR3 formula to each day in the week, then take
+ * the LATEST result.  This is the most conservative choice — it guarantees
+ * that no day's iqama falls too close to sunrise while still respecting the
+ * 75-minute maximum delay.
+ *
+ * The result is rounded up to the nearest 5 minutes (already done by
+ * computeFajrIqama for each day, but the max selection may land on a clean
+ * boundary anyway).
+ *
+ * @param weekDays - Array of { fajrAzan, sunrise } for each day in the week
+ *                   (Friday through Thursday, 7 entries).
+ * @returns HH:mm string — the fixed Fajr Iqama for the whole week.
+ */
+export function computeWeeklyFajrIqama(weekDays: WeeklyFajrEntry[]): string {
+  if (weekDays.length === 0) {
+    throw new Error('weekDays must contain at least one entry');
+  }
+
+  // Compute the per-day iqama for each day and keep the latest (HH:mm string
+  // comparison works correctly because times are zero-padded 24-hour format).
+  return weekDays
+    .map(({ fajrAzan, sunrise }) => computeFajrIqama(fajrAzan, sunrise))
+    .reduce((latest, current) => (current > latest ? current : latest));
+}

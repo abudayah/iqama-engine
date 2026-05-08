@@ -126,8 +126,10 @@ describe('ScheduleBuilderService', () => {
       expect(firstDay.metadata.has_overrides).toBe(false);
       expect(firstDay.hijri_date).toBeDefined();
 
-      // Verify all days were processed
-      expect(adhanAdapter.getPrayerTimes).toHaveBeenCalledTimes(30);
+      // Verify all days were processed.
+      // Each day triggers 1 call for itself + 7 calls for its Friday→Thursday
+      // weekly window (FR3-W / FR4-W), so total = 30 × 8 = 240.
+      expect(adhanAdapter.getPrayerTimes).toHaveBeenCalledTimes(240);
       expect(rulesService.computeIqama).toHaveBeenCalledTimes(30);
       expect(overrideService.getOverridesForDate).toHaveBeenCalledTimes(30);
     });

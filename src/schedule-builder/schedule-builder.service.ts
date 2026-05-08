@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Dayjs } from 'dayjs';
 import dayjs from '../dayjs';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
-import { RulesService } from '../rules/rules.service';
+import { RulesService, WeeklyContext } from '../rules/rules.service';
+import { WeeklyFajrEntry } from '../rules/fajr.rule';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
@@ -104,10 +105,13 @@ export class ScheduleBuilderService {
       // (b) Get overrides for this day
       const overrides = await this.overrideService.getOverridesForDate(date);
 
-      // (c) Compute iqama times via FR1–FR4
-      const iqamaTimes = this.rulesService.computeIqama(date, raw);
+      // (c) Build the weekly context (Friday→Thursday window) for FR3-W / FR4-W
+      const weeklyCtx = this.buildWeeklyContext(date, tz);
 
-      // (d) Build rawAzanMap for OFFSET override calculations
+      // (d) Compute iqama times via FR1–FR4 (weekly rules for Fajr & Isha)
+      const iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
+
+      // (e) Build rawAzanMap for OFFSET override calculations
       const rawAzanMap: Record<string, Dayjs> = {
         fajr: raw.fajr,
         dhuhr: raw.dhuhr,
@@ -120,7 +124,7 @@ export class ScheduleBuilderService {
       const { iqamaTimes: finalIqama, hasOverrides } =
         this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
 
-      // (e) Build the DailySchedule object
+      // (f) Build the DailySchedule object
       const dateDayjs = dayjs.tz(date, tz);
       const hijriDate = formatHijriDate(dateDayjs);
 
@@ -160,6 +164,44 @@ export class ScheduleBuilderService {
     }
 
     return schedules;
+  }
+
+  /**
+   * Build the WeeklyContext for a given date.
+   *
+   * The week window runs from the most recent Friday (inclusive) through the
+   * following Thursday (inclusive), i.e. 7 days.  This is the canonical
+   * Islamic week used for announcing fixed Fajr and Isha Iqama times.
+   *
+   * dayjs day-of-week: 0 = Sunday … 5 = Friday … 6 = Saturday
+   */
+  private buildWeeklyContext(date: string, tz: string): WeeklyContext {
+    const d = dayjs.tz(date, tz);
+
+    // Find the Friday that starts this week.
+    // dayjs .day() → 0 Sun, 1 Mon, 2 Tue, 3 Wed, 4 Thu, 5 Fri, 6 Sat
+    const dayOfWeek = d.day(); // 0–6
+    // Days since last Friday: Fri=0, Sat=1, Sun=2, Mon=3, Tue=4, Wed=5, Thu=6
+    const daysSinceFriday = (dayOfWeek + 2) % 7;
+    const weekStart = d.subtract(daysSinceFriday, 'day'); // Friday
+
+    const fajrWeek: WeeklyFajrEntry[] = [];
+    const ishaWeek: Dayjs[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const weekDate = weekStart.add(i, 'day');
+      const weekDateObj = weekDate
+        .hour(12)
+        .minute(0)
+        .second(0)
+        .millisecond(0)
+        .toDate();
+      const weekRaw = this.adhanAdapter.getPrayerTimes(weekDateObj);
+      fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
+      ishaWeek.push(weekRaw.isha);
+    }
+
+    return { fajrWeek, ishaWeek };
   }
 
   async getMonth(yearMonth: string): Promise<DailySchedule[]> {
