@@ -1,0 +1,27 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYMENT_PATH=/home2/theisbcc/api.iqama.theisbc.ca
+    
+    # 1. Sync files, but exclude node_modules and git metadata to save time/space
+    - /usr/bin/rsync -avz --exclude '.git' --exclude 'node_modules' . $DEPLOYMENT_PATH
+
+    # 2. Navigate to the app root
+    - cd $DEPLOYMENT_PATH
+
+    # 3. Use the specific Node version path (Typical cPanel path, verify yours in Terminal)
+    # If npm isn't found, use: /nodevenv/api.iqama.theisbc.ca/bin/npm install
+    - npm install --omit=dev
+
+    # 4. Generate Prisma Client (Critical for NestJS)
+    - npx prisma generate
+
+    # 5. Run Migrations
+    - npx prisma migrate deploy
+
+    # 6. Build the NestJS project
+    - npm run build
+
+    # 7. Trigger the Passenger restart
+    - mkdir -p tmp
+    - touch tmp/restart.txt
