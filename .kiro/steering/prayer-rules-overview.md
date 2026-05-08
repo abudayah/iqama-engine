@@ -42,7 +42,7 @@ Each prayer has its own rule file in `src/rules/`:
 **Calculation**:
 
 - Max_Delay = Azan + 75 min
-- Safe_Sunrise_Limit = Sunrise - 45 min
+- Safe_Sunrise_Limit = Sunrise - 60 min
 - Base_Target = min(Max_Delay, Safe_Sunrise_Limit)
 - If Base_Target < Azan + 10 min: Base_Target = Azan + 10 min
 - Iqama = CeilingToNearest5(Base_Target)

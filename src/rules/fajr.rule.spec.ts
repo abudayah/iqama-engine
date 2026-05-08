@@ -9,23 +9,23 @@ describe('Fajr Rule', () => {
 
       const result = computeFajrIqama(fajrAzan, sunrise);
 
-      // Safe limit: 09:00 - 45 = 08:15
+      // Safe limit: 09:00 - 60 = 08:00
       // Max delay: 06:30 + 75 = 07:45
-      // Base target: min(07:45, 08:15) = 07:45
+      // Base target: min(07:45, 08:00) = 07:45
       // Result: 07:45
       expect(result).toBe('07:45');
     });
 
-    it('should respect 45-minute buffer before sunrise', () => {
+    it('should respect 60-minute buffer before sunrise', () => {
       const fajrAzan = dayjs.tz('2025-06-21 03:16', 'America/Vancouver');
       const sunrise = dayjs.tz('2025-06-21 05:05', 'America/Vancouver');
 
       const result = computeFajrIqama(fajrAzan, sunrise);
 
-      // Safe limit: 05:05 - 45 = 04:20
+      // Safe limit: 05:05 - 60 = 04:05
       // Max delay: 03:16 + 75 = 04:31
-      // Base target: min(04:31, 04:20) = 04:20
-      expect(result).toBe('04:20');
+      // Base target: min(04:31, 04:05) = 04:05
+      expect(result).toBe('04:05');
     });
 
     it('should enforce minimum 10-minute delay from Azan', () => {
@@ -34,11 +34,11 @@ describe('Fajr Rule', () => {
 
       const result = computeFajrIqama(fajrAzan, sunrise);
 
-      // Safe limit: 04:05 - 45 = 03:20 (before Azan!)
+      // Safe limit: 04:05 - 60 = 03:05 (before Azan!)
       // Max delay: 04:00 + 75 = 05:15
-      // Base target: min(05:15, 03:20) = 03:20
+      // Base target: min(05:15, 03:05) = 03:05
       // Floor clamp: 04:00 + 10 = 04:10
-      // Result: max(03:20, 04:10) = 04:10
+      // Result: max(03:05, 04:10) = 04:10
       expect(result).toBe('04:10');
     });
 
@@ -48,9 +48,9 @@ describe('Fajr Rule', () => {
 
       const result = computeFajrIqama(fajrAzan, sunrise);
 
-      // Safe limit: 09:00 - 45 = 08:15
+      // Safe limit: 09:00 - 60 = 08:00
       // Max delay: 06:32 + 75 = 07:47
-      // Base target: min(07:47, 08:15) = 07:47
+      // Base target: min(07:47, 08:00) = 07:47
       // Rounded: 07:50
       expect(result).toBe('07:50');
     });
@@ -61,9 +61,9 @@ describe('Fajr Rule', () => {
 
       const result = computeFajrIqama(fajrAzan, sunrise);
 
-      // Safe limit: 10:00 - 45 = 09:15
+      // Safe limit: 10:00 - 60 = 09:00
       // Max delay: 06:00 + 75 = 07:15
-      // Base target: min(07:15, 09:15) = 07:15
+      // Base target: min(07:15, 09:00) = 07:15
       expect(result).toBe('07:15');
     });
   });

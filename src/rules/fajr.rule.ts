@@ -7,7 +7,7 @@ import { ceilingToNearest5, formatHHmm } from './time-utils';
  * This rule calculates Fajr Iqama dynamically based on astronomical times:
  *
  * Max_Delay          = Azan + 75 min
- * Safe_Sunrise_Limit = Sunrise - 45 min
+ * Safe_Sunrise_Limit = Sunrise - 60 min
  * Base_Target        = min(Max_Delay, Safe_Sunrise_Limit)
  * if Base_Target < Azan + 10 min: Base_Target = Azan + 10 min
  * Iqama = CeilingToNearest5(Base_Target)
@@ -23,7 +23,7 @@ export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
   const sunriseClean = sunrise.startOf('minute');
 
   const maxDelay = fajrAzanClean.add(75, 'minute');
-  const safeSunriseLimit = sunriseClean.subtract(45, 'minute');
+  const safeSunriseLimit = sunriseClean.subtract(60, 'minute');
 
   let baseTarget = maxDelay.isBefore(safeSunriseLimit)
     ? maxDelay
