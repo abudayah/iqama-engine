@@ -2,9 +2,9 @@
 deployment:
   tasks:
     # Install production dependencies only (skip scripts to avoid node path issues)
-    - /bin/bash -c "cd /home2/theisbcc/iqama.theisbc.ca/api && /opt/cpanel/ea-nodejs20/bin/npm install --omit=dev --ignore-scripts"
+    - /bin/bash -c "cd /home2/theisbcc/iqama.theisbc.ca/api && /opt/cpanel/ea-nodejs22/bin/npm install --omit=dev --ignore-scripts"
     # Generate Prisma Client for production
-    - /bin/bash -c "cd /home2/theisbcc/iqama.theisbc.ca/api && /opt/cpanel/ea-nodejs20/bin/npx prisma generate"
+    - /bin/bash -c "cd /home2/theisbcc/iqama.theisbc.ca/api && /opt/cpanel/ea-nodejs22/bin/npx prisma generate"
     # Restart the Node.js app via Passenger
     - /bin/mkdir -p /home2/theisbcc/iqama.theisbc.ca/api/tmp
     - /bin/touch /home2/theisbcc/iqama.theisbc.ca/api/tmp/restart.txt
