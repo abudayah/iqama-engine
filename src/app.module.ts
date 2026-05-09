@@ -5,12 +5,13 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { HijriCalendarModule } from './hijri-calendar/hijri-calendar.module';
+import { join } from 'path';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: join(__dirname, '..', '..', '.env'),
       load: [appConfig],
     }),
     ScheduleModule,
