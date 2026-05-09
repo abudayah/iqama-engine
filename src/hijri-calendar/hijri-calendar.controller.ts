@@ -22,7 +22,7 @@ import { EidPrayerRecordDto } from './dto/eid-prayer-record.dto';
 import { QiyamConfigDto } from './dto/qiyam-config.dto';
 import dayjs from '../dayjs';
 
-@Controller('v1/hijri-calendar')
+@Controller('api/v1/hijri-calendar')
 @UsePipes(
   new ValidationPipe({
     transform: true,

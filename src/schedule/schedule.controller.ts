@@ -3,7 +3,7 @@ import { ScheduleService } from './schedule.service';
 import { ScheduleQueryDto } from './dto/schedule-query.dto';
 import { DailySchedule } from './daily-schedule.interface';
 
-@Controller('v1/schedule')
+@Controller('api/v1/schedule')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
 
