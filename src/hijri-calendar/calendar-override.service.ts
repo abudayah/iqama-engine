@@ -173,11 +173,11 @@ export class CalendarOverrideService {
         type,
         hijri_year: hijriYear,
         date,
-        prayers: prayersJson,
+        prayers: JSON.stringify(prayersJson),
       },
       update: {
         date,
-        prayers: prayersJson,
+        prayers: JSON.stringify(prayersJson),
       },
     });
   }
@@ -224,7 +224,10 @@ export class CalendarOverrideService {
 
       if (specialPrayer) {
         eidDate = specialPrayer.date;
-        prayers = specialPrayer.prayers as { label: string; time: string }[];
+        prayers = JSON.parse(specialPrayer.prayers) as {
+          label: string;
+          time: string;
+        }[];
         source = 'override';
       } else {
         // 3. Get CalendarOverride for the preceding month

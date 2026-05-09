@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 
 @Injectable()
 export class PrismaService
@@ -15,15 +15,9 @@ export class PrismaService
       throw new Error('DATABASE_URL is not defined');
     }
 
-    const url = new URL(databaseUrl);
-
-    const adapter = new PrismaMariaDb({
-      host: url.hostname,
-      port: parseInt(url.port) || 3306,
-      user: url.username,
-      password: url.password,
-      database: url.pathname.slice(1), // remove leading /
-      connectionLimit: 5,
+    // Create libSQL adapter for SQLite
+    const adapter = new PrismaLibSql({
+      url: databaseUrl,
     });
 
     super({ adapter });

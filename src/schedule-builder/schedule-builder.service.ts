@@ -75,7 +75,10 @@ export class ScheduleBuilderService {
     // Build a map: date → { prayer1, prayer2 } for O(1) lookup
     const eidByDate = new Map<string, { prayer1: string; prayer2: string }>();
     for (const sp of specialPrayers) {
-      const prayers = sp.prayers as { label: string; time: string }[];
+      const prayers = JSON.parse(sp.prayers) as {
+        label: string;
+        time: string;
+      }[];
       const p1 =
         prayers.find((p) => p.label === '1st Eid Prayer')?.time ??
         FALLBACK_EID_PRAYER_1;

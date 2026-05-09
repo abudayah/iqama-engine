@@ -1,10 +1,9 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "binary"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
 }
 
 model Override {
@@ -12,8 +11,8 @@ model Override {
   prayer       String    // "fajr" | "dhuhr" | "asr" | "maghrib" | "isha"
   overrideType String    // "FIXED" | "OFFSET"
   value        String    // HH:mm for FIXED, integer minutes as string for OFFSET
-  startDate    DateTime  @db.Date
-  endDate      DateTime  @db.Date
+  startDate    DateTime
+  endDate      DateTime
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime? // soft delete — null means active
@@ -36,7 +35,7 @@ model SpecialPrayer {
   type       String   // "EID_AL_FITR" | "EID_AL_ADHA"
   hijri_year Int
   date       String   // YYYY-MM-DD Gregorian date
-  prayers    Json     // Array of { label: string, time: string }
+  prayers    String   // JSON string: Array of { label: string, time: string }
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
