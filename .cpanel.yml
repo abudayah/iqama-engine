@@ -5,6 +5,10 @@ deployment:
     - /bin/bash -c "export PATH=/opt/cpanel/ea-nodejs22/bin:$PATH && cd /home2/theisbcc/iqama.theisbc.ca/api && npm install --omit=dev --ignore-scripts"
     # Generate Prisma Client for production
     - /bin/bash -c "export PATH=/opt/cpanel/ea-nodejs22/bin:$PATH && cd /home2/theisbcc/iqama.theisbc.ca/api && npx prisma generate"
+    # Run database migrations
+    - /bin/bash -c "export PATH=/opt/cpanel/ea-nodejs22/bin:$PATH && cd /home2/theisbcc/iqama.theisbc.ca/api && npx prisma migrate deploy"
+    # Build the application
+    - /bin/bash -c "export PATH=/opt/cpanel/ea-nodejs22/bin:$PATH && cd /home2/theisbcc/iqama.theisbc.ca/api && npm run build"
     # Restart the Node.js app via Passenger
     - /bin/mkdir -p /home2/theisbcc/iqama.theisbc.ca/api/tmp
     - /bin/touch /home2/theisbcc/iqama.theisbc.ca/api/tmp/restart.txt
