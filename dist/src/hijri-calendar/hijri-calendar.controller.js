@@ -105,7 +105,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], HijriCalendarController.prototype, "saveQiyamConfig", null);
 exports.HijriCalendarController = HijriCalendarController = __decorate([
-    (0, common_1.Controller)('api/v1/hijri-calendar'),
+    (0, common_1.Controller)('v1/hijri-calendar'),
     (0, common_1.UsePipes)(new common_1.ValidationPipe({
         transform: true,
         whitelist: true,

@@ -135,7 +135,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "clearAllOverrides", null);
 exports.AdminController = AdminController = __decorate([
-    (0, common_1.Controller)('api/v1/admin'),
+    (0, common_1.Controller)('v1/admin'),
     (0, common_1.UseGuards)(api_key_guard_1.ApiKeyGuard),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], AdminController);

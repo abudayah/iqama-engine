@@ -50,7 +50,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], ScheduleController.prototype, "getSchedule", null);
 exports.ScheduleController = ScheduleController = __decorate([
-    (0, common_1.Controller)('api/v1/schedule'),
+    (0, common_1.Controller)('v1/schedule'),
     __metadata("design:paramtypes", [schedule_service_1.ScheduleService])
 ], ScheduleController);
 //# sourceMappingURL=schedule.controller.js.map

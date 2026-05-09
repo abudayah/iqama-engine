@@ -17,7 +17,7 @@ import { CreateOverrideDto } from './dto/create-override.dto';
 import { UpdateOverrideDto } from './dto/update-override.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 
-@Controller('api/v1/admin')
+@Controller('v1/admin')
 @UseGuards(ApiKeyGuard)
 export class AdminController {
   constructor(private readonly prisma: PrismaService) {}

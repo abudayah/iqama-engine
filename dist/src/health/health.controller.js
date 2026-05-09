@@ -50,7 +50,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], HealthController.prototype, "check", null);
 exports.HealthController = HealthController = __decorate([
-    (0, common_1.Controller)('api/v1/health'),
+    (0, common_1.Controller)('v1/health'),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], HealthController);
 //# sourceMappingURL=health.controller.js.map
