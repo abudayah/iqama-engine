@@ -2,6 +2,9 @@
 # Deploy script for iqama-engine
 # Run this on the server: bash deploy.sh
 
+# Set PATH to include cPanel Node.js
+export PATH="/opt/cpanel/ea-nodejs22/bin:$PATH"
+
 cd /home2/theisbcc/iqama.theisbc.ca/api || exit 1
 
 echo "Pulling latest changes from main branch..."
