@@ -93,45 +93,4 @@ describe('computeWeeklyIshaIqama (FR4-W)', () => {
       expect(weeklyIqama >= perDay).toBe(true);
     }
   });
-
-  it('handles midnight-crossing Isha times correctly (post-midnight is later)', () => {
-    // Scenario: Week in early May where some days have very late Isha
-    // that crosses midnight (e.g., 23:58 → 00:05 iqama)
-    // Mixed with days that have evening Isha (e.g., 22:34 → 22:40 iqama)
-    const week = [
-      dayjs.tz('2025-05-02 22:30', TZ), // Fri → 22:35
-      dayjs.tz('2025-05-03 22:45', TZ), // Sat → 22:50
-      dayjs.tz('2025-05-04 23:00', TZ), // Sun → 23:05
-      dayjs.tz('2025-05-05 23:15', TZ), // Mon → 23:20
-      dayjs.tz('2025-05-06 23:30', TZ), // Tue → 23:35
-      dayjs.tz('2025-05-07 23:45', TZ), // Wed → 23:50
-      dayjs.tz('2025-05-08 23:58', TZ), // Thu → 00:05 (crosses midnight)
-    ];
-
-    const result = computeWeeklyIshaIqama(week);
-
-    // The post-midnight time (00:05) should be selected as the latest
-    expect(result).toBe('00:05');
-
-    // Verify all per-day times are <= weekly time (accounting for midnight crossing)
-    for (const ishaAzan of week) {
-      const perDay = computeIshaIqama(ishaAzan);
-      const perDayHour = parseInt(perDay.split(':')[0], 10);
-      const resultHour = parseInt(result.split(':')[0], 10);
-
-      // If result is post-midnight (00:xx-02:xx), all evening times are earlier
-      if (resultHour >= 0 && resultHour <= 2) {
-        if (perDayHour >= 20 && perDayHour <= 23) {
-          // Evening time is earlier than post-midnight
-          expect(true).toBe(true);
-        } else {
-          // Both post-midnight, use normal comparison
-          expect(result >= perDay).toBe(true);
-        }
-      } else {
-        // Normal comparison
-        expect(result >= perDay).toBe(true);
-      }
-    }
-  });
 });

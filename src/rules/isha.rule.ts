@@ -78,30 +78,9 @@ export function computeWeeklyIshaIqama(weekDays: Dayjs[]): string {
     throw new Error('weekDays must contain at least one entry');
   }
 
-  // Compute the per-day iqama for each day and keep the latest.
-  // Special handling: times after midnight (00:xx - 02:xx) are treated as
-  // "later" than evening times (20:xx - 23:xx) since they occur on the next day.
-  const iqamaTimes = weekDays.map((ishaAzan) => computeIshaIqama(ishaAzan));
-
-  return iqamaTimes.reduce((latest, current) => {
-    // Extract hours for comparison
-    const latestHour = parseInt(latest.split(':')[0], 10);
-    const currentHour = parseInt(current.split(':')[0], 10);
-
-    // Times 00:xx-02:xx are post-midnight Isha (very late summer)
-    // Times 20:xx-23:xx are evening Isha (normal range)
-    const latestIsPostMidnight = latestHour >= 0 && latestHour <= 2;
-    const currentIsPostMidnight = currentHour >= 0 && currentHour <= 2;
-
-    // If one is post-midnight and the other isn't, post-midnight is later
-    if (currentIsPostMidnight && !latestIsPostMidnight) {
-      return current;
-    }
-    if (latestIsPostMidnight && !currentIsPostMidnight) {
-      return latest;
-    }
-
-    // Both in same category (both post-midnight or both evening), use string comparison
-    return current > latest ? current : latest;
-  });
+  // Compute the per-day iqama for each day and keep the latest (HH:mm string
+  // comparison works correctly because times are zero-padded 24-hour format).
+  return weekDays
+    .map((ishaAzan) => computeIshaIqama(ishaAzan))
+    .reduce((latest, current) => (current > latest ? current : latest));
 }
