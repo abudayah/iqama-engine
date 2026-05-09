@@ -5,6 +5,10 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Set global prefix for all routes (e.g., /api/v1/...)
+  // This allows the app to work when deployed at a subpath like /api
+  app.setGlobalPrefix('api');
+
   // CORS — driven by CORS_ORIGIN env variable.
   // Accepts a comma-separated list of allowed origins, or '*' for open access.
   // Example: CORS_ORIGIN=http://localhost:5173,https://prayers.example.com
