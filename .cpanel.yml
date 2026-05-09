@@ -1,22 +1,10 @@
 ---
 deployment:
   tasks:
-    - export DEPLOY=/home2/theisbcc/api.iqama.theisbc.ca
-
-    # Sync repo files to deployment directory (exclude git and node_modules)
-    - /usr/bin/rsync -avz --exclude '.git' --exclude 'node_modules' --exclude 'dist' . $DEPLOY/
-
-    # Install production dependencies
-    - cd $DEPLOY && npm install --omit=dev
-
-    # Generate Prisma client
-    - cd $DEPLOY && npx prisma generate
-
-    # Run database migrations
-    - cd $DEPLOY && npx prisma migrate deploy
-
-    # Build the NestJS app
-    - cd $DEPLOY && npm run build
-
-    # Restart the Node.js app via Passenger
-    - mkdir -p $DEPLOY/tmp && touch $DEPLOY/tmp/restart.txt
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npm install"
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npx prisma generate"
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npm run build"
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npm prune --omit=dev"
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npx prisma migrate deploy"
+    - /bin/mkdir -p /home2/theisbcc/api.iqama.theisbc.ca/tmp
+    - /bin/touch /home2/theisbcc/api.iqama.theisbc.ca/tmp/restart.txt
