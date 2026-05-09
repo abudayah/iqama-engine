@@ -1,10 +1,10 @@
 ---
 deployment:
   tasks:
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npm install"
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npx prisma generate"
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npm run build"
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npm prune --omit=dev"
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && npx prisma migrate deploy"
+    - /bin/bash -c "source /home2/theisbcc/nodevenv/api.iqama.theisbc.ca/20/bin/activate && cd /home2/theisbcc/api.iqama.theisbc.ca && npm install"
+    - /bin/bash -c "source /home2/theisbcc/nodevenv/api.iqama.theisbc.ca/20/bin/activate && cd /home2/theisbcc/api.iqama.theisbc.ca && npx prisma generate"
+    - /bin/bash -c "source /home2/theisbcc/nodevenv/api.iqama.theisbc.ca/20/bin/activate && cd /home2/theisbcc/api.iqama.theisbc.ca && npm run build"
+    - /bin/bash -c "source /home2/theisbcc/nodevenv/api.iqama.theisbc.ca/20/bin/activate && cd /home2/theisbcc/api.iqama.theisbc.ca && npm prune --omit=dev"
+    - /bin/bash -c "source /home2/theisbcc/nodevenv/api.iqama.theisbc.ca/20/bin/activate && cd /home2/theisbcc/api.iqama.theisbc.ca && npx prisma migrate deploy"
     - /bin/mkdir -p /home2/theisbcc/api.iqama.theisbc.ca/tmp
     - /bin/touch /home2/theisbcc/api.iqama.theisbc.ca/tmp/restart.txt
