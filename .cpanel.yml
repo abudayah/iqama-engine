@@ -1,7 +1,8 @@
 ---
 deployment:
   tasks:
+    # Install production dependencies only (skip scripts to avoid node path issues)
     - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && /opt/cpanel/ea-nodejs16/bin/npm install --omit=dev --ignore-scripts"
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && /opt/cpanel/ea-nodejs16/bin/npx prisma migrate deploy"
+    # Restart the Node.js app via Passenger
     - /bin/mkdir -p /home2/theisbcc/api.iqama.theisbc.ca/tmp
     - /bin/touch /home2/theisbcc/api.iqama.theisbc.ca/tmp/restart.txt
