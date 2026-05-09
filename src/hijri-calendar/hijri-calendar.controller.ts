@@ -39,9 +39,9 @@ export class HijriCalendarController {
   /**
    * GET /api/v1/hijri-calendar/status
    * Returns the current Hijri date and whether an override already exists.
+   * Public endpoint - used by the moon-sighting card on the home page.
    */
   @Get('status')
-  @UseGuards(ApiKeyGuard)
   async getStatus(): Promise<HijriCalendarStatusDto> {
     return this.calendarOverrideService.getStatus();
   }
