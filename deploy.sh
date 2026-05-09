@@ -4,12 +4,12 @@
 
 cd /home2/theisbcc/iqama.theisbc.ca/api || exit 1
 
-echo "Pulling latest changes from prod branch..."
-git fetch origin prod
-git reset --hard origin/prod
+echo "Pulling latest changes from main branch..."
+git fetch origin main
+git reset --hard origin/main
 
 echo "Installing dependencies..."
-/opt/cpanel/ea-nodejs22/bin/npm install --production
+/opt/cpanel/ea-nodejs22/bin/npm install
 
 echo "Generating Prisma Client..."
 /opt/cpanel/ea-nodejs22/bin/npx prisma generate
@@ -20,12 +20,26 @@ echo "Running database migrations..."
 echo "Building application..."
 /opt/cpanel/ea-nodejs22/bin/npm run build
 
-echo "Restarting application..."
-# Find and kill the existing Node process
-pkill -f "node dist/main.js" || echo "No existing process found"
+echo "Restarting application via Passenger..."
+# Create tmp directory if it doesn't exist
+mkdir -p tmp
 
-# Start the application in the background
-nohup /opt/cpanel/ea-nodejs22/bin/npm run start:prod > /dev/null 2>&1 &
+# Touch restart.txt to trigger Passenger restart
+touch tmp/restart.txt
 
+echo ""
 echo "API deployment complete!"
-echo "Check health: curl https://iqama.theisbc.ca/api/v1/health"
+echo "Waiting for Passenger to restart..."
+sleep 5
+
+# Check if the process is running
+if ps aux | grep "dist/src/main" | grep -v grep > /dev/null; then
+    echo "✓ API process is running"
+else
+    echo "✗ API process not found (may still be starting)"
+fi
+
+echo ""
+echo "Health check:"
+curl https://iqama.theisbc.ca/api/v1/health
+echo ""
