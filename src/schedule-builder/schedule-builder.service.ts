@@ -203,12 +203,9 @@ export class ScheduleBuilderService {
 
     for (let i = 0; i < 7; i++) {
       const weekDate = weekStart.add(i, 'day');
-      const weekDateObj = weekDate
-        .hour(12)
-        .minute(0)
-        .second(0)
-        .millisecond(0)
-        .toDate();
+      // Use the same pattern as the main calculation to ensure timezone consistency
+      const weekDateStr = weekDate.format('YYYY-MM-DD');
+      const weekDateObj = dayjs.tz(`${weekDateStr}T12:00:00`, tz).toDate();
       const weekRaw = this.adhanAdapter.getPrayerTimes(weekDateObj);
       fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
       ishaWeek.push(weekRaw.isha);
