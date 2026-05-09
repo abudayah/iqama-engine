@@ -2,7 +2,7 @@
 node_modules/
 
 # Build outputs
-dist/
+# dist/ is committed so cPanel can run without building on server
 build/
 *.tsbuildinfo
 

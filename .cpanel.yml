@@ -1,6 +1,7 @@
 ---
 deployment:
   tasks:
-    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && /opt/cpanel/ea-nodejs16/bin/npm install && /opt/cpanel/ea-nodejs16/bin/npx prisma generate && /opt/cpanel/ea-nodejs16/bin/npm run build && /opt/cpanel/ea-nodejs16/bin/npm prune --omit=dev && /opt/cpanel/ea-nodejs16/bin/npx prisma migrate deploy"
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && /opt/cpanel/ea-nodejs16/bin/npm install --omit=dev --ignore-scripts"
+    - /bin/bash -c "cd /home2/theisbcc/api.iqama.theisbc.ca && /opt/cpanel/ea-nodejs16/bin/npx prisma migrate deploy"
     - /bin/mkdir -p /home2/theisbcc/api.iqama.theisbc.ca/tmp
     - /bin/touch /home2/theisbcc/api.iqama.theisbc.ca/tmp/restart.txt
