@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { CreateOverrideDto } from './dto/create-override.dto';
 import { UpdateOverrideDto } from './dto/update-override.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
@@ -36,9 +37,16 @@ describe('AdminController', () => {
       },
     };
 
+    const mockScheduleBuilder = {
+      invalidateCache: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminController],
-      providers: [{ provide: PrismaService, useValue: mockPrismaService }],
+      providers: [
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: ScheduleBuilderService, useValue: mockScheduleBuilder },
+      ],
     })
       .overrideGuard(ApiKeyGuard)
       .useValue({ canActivate: () => true })

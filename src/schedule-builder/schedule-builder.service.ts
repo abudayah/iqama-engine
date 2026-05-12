@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { Dayjs } from 'dayjs';
 import dayjs from '../dayjs';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
@@ -51,6 +53,7 @@ export class ScheduleBuilderService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly qiyamConfigService: QiyamConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     this.timezone = this.configService.get<string>('app.masjidTimezone')!;
   }
@@ -215,6 +218,53 @@ export class ScheduleBuilderService {
   }
 
   async getMonth(yearMonth: string): Promise<DailySchedule[]> {
-    return this.buildMonth(yearMonth);
+    const cacheKey = `schedule:${yearMonth}`;
+
+    // Try to get from cache first
+    const cached = await this.cacheManager.get<DailySchedule[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Build and cache
+    const schedules = await this.buildMonth(yearMonth);
+    await this.cacheManager.set(cacheKey, schedules);
+
+    return schedules;
+  }
+
+  /**
+   * Invalidate cache for affected months when overrides or special prayers change.
+   * Called by admin operations.
+   */
+  async invalidateCache(startDate?: string, endDate?: string): Promise<void> {
+    if (!startDate && !endDate) {
+      // Clear all cache by deleting all keys with schedule: prefix
+      // Note: cache-manager doesn't have reset(), so we'll use store.reset() if available
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const store = (this.cacheManager as any).store;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (store && typeof store.reset === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await store.reset();
+      }
+      return;
+    }
+
+    // Invalidate specific months affected by the date range
+    const start = dayjs(startDate);
+    const end = dayjs(endDate || startDate);
+
+    const monthsToInvalidate = new Set<string>();
+    let current = start.startOf('month');
+
+    while (current.isBefore(end) || current.isSame(end, 'month')) {
+      monthsToInvalidate.add(current.format('YYYY-MM'));
+      current = current.add(1, 'month');
+    }
+
+    for (const yearMonth of monthsToInvalidate) {
+      await this.cacheManager.del(`schedule:${yearMonth}`);
+    }
   }
 }

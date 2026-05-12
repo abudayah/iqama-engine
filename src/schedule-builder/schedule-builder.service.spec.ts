@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import dayjs from '../dayjs';
 import { ScheduleBuilderService } from './schedule-builder.service';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
@@ -44,6 +45,15 @@ describe('ScheduleBuilderService', () => {
       getForYear: jest.fn().mockResolvedValue(null),
     };
 
+    const mockCacheManager = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      del: jest.fn().mockResolvedValue(undefined),
+      store: {
+        reset: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduleBuilderService,
@@ -53,6 +63,7 @@ describe('ScheduleBuilderService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QiyamConfigService, useValue: mockQiyamConfigService },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
       ],
     }).compile();
 

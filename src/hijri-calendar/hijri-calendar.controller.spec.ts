@@ -8,6 +8,7 @@ import * as fc from 'fast-check';
 import { HijriCalendarController } from './hijri-calendar.controller';
 import { CalendarOverrideService } from './calendar-override.service';
 import { QiyamConfigService } from './qiyam-config.service';
+import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { QiyamConfigDto } from './dto/qiyam-config.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 
@@ -73,6 +74,10 @@ describe('HijriCalendarController', () => {
     exceptionFactory: (errors) => new UnprocessableEntityException(errors),
   });
 
+  const mockScheduleBuilder = {
+    invalidateCache: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     mockCalendarOverrideService = createMockCalendarOverrideService();
     mockQiyamConfigService = createMockQiyamConfigService();
@@ -85,6 +90,7 @@ describe('HijriCalendarController', () => {
           useValue: mockCalendarOverrideService,
         },
         { provide: QiyamConfigService, useValue: mockQiyamConfigService },
+        { provide: ScheduleBuilderService, useValue: mockScheduleBuilder },
       ],
     })
       // Override ApiKeyGuard so we can test 401 separately
@@ -176,6 +182,7 @@ describe('HijriCalendarController', () => {
             useValue: mockCalendarOverrideService,
           },
           { provide: QiyamConfigService, useValue: mockQiyamConfigService },
+          { provide: ScheduleBuilderService, useValue: mockScheduleBuilder },
         ],
       })
         .overrideGuard(ApiKeyGuard)

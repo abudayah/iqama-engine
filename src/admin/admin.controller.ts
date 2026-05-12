@@ -13,6 +13,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { CreateOverrideDto } from './dto/create-override.dto';
 import { UpdateOverrideDto } from './dto/update-override.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
@@ -20,7 +21,10 @@ import { ApiKeyGuard } from '../auth/api-key.guard';
 @Controller('api/v1/admin')
 @UseGuards(ApiKeyGuard)
 export class AdminController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scheduleBuilder: ScheduleBuilderService,
+  ) {}
 
   /**
    * Create a new override
@@ -38,6 +42,9 @@ export class AdminController {
         endDate: new Date(dto.endDate),
       },
     });
+
+    // Invalidate cache for affected months
+    await this.scheduleBuilder.invalidateCache(dto.startDate, dto.endDate);
 
     return override;
   }
@@ -103,6 +110,17 @@ export class AdminController {
       },
     });
 
+    // Invalidate cache for both old and new date ranges
+    const oldStart = existing.startDate.toISOString().split('T')[0];
+    const oldEnd = existing.endDate.toISOString().split('T')[0];
+    await this.scheduleBuilder.invalidateCache(oldStart, oldEnd);
+
+    if (dto.startDate || dto.endDate) {
+      const newStart = dto.startDate || oldStart;
+      const newEnd = dto.endDate || oldEnd;
+      await this.scheduleBuilder.invalidateCache(newStart, newEnd);
+    }
+
     return updated;
   }
 
@@ -125,6 +143,11 @@ export class AdminController {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    // Invalidate cache for affected months
+    const startDate = existing.startDate.toISOString().split('T')[0];
+    const endDate = existing.endDate.toISOString().split('T')[0];
+    await this.scheduleBuilder.invalidateCache(startDate, endDate);
   }
 
   /**
@@ -138,5 +161,8 @@ export class AdminController {
       where: { deletedAt: null },
       data: { deletedAt: new Date() },
     });
+
+    // Clear entire cache since we don't know which months were affected
+    await this.scheduleBuilder.invalidateCache();
   }
 }

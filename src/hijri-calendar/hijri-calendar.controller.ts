@@ -15,6 +15,7 @@ import {
 import { ApiKeyGuard } from '../auth/api-key.guard';
 import { CalendarOverrideService } from './calendar-override.service';
 import { QiyamConfigService } from './qiyam-config.service';
+import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { getHijriComponents } from './hijri-utils';
 import { SubmitOverrideDto } from './dto/submit-override.dto';
 import { HijriCalendarStatusDto } from './dto/hijri-calendar-status.dto';
@@ -34,6 +35,7 @@ export class HijriCalendarController {
   constructor(
     private readonly calendarOverrideService: CalendarOverrideService,
     private readonly qiyamConfigService: QiyamConfigService,
+    private readonly scheduleBuilder: ScheduleBuilderService,
   ) {}
 
   /**
@@ -54,7 +56,10 @@ export class HijriCalendarController {
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.CREATED)
   async submitOverride(@Body() dto: SubmitOverrideDto): Promise<void> {
-    return this.calendarOverrideService.submitOverride(dto);
+    await this.calendarOverrideService.submitOverride(dto);
+
+    // Invalidate cache - clear all since Hijri calendar affects date display
+    await this.scheduleBuilder.invalidateCache();
   }
 
   /**
@@ -66,10 +71,13 @@ export class HijriCalendarController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteOverride(): Promise<void> {
     const { year: hijriYear, month: hijriMonth } = getHijriComponents(dayjs());
-    return this.calendarOverrideService.deleteCalendarOverride(
+    await this.calendarOverrideService.deleteCalendarOverride(
       hijriYear,
       hijriMonth,
     );
+
+    // Invalidate cache - clear all since Hijri calendar affects date display
+    await this.scheduleBuilder.invalidateCache();
   }
 
   /**
@@ -113,6 +121,10 @@ export class HijriCalendarController {
   @HttpCode(HttpStatus.CREATED)
   async saveQiyamConfig(@Body() dto: QiyamConfigDto): Promise<void> {
     const { year: hijriYear } = getHijriComponents(dayjs());
-    return this.qiyamConfigService.upsert(hijriYear, dto.start_time);
+    await this.qiyamConfigService.upsert(hijriYear, dto.start_time);
+
+    // Invalidate cache for Ramadan months (month 9)
+    // Since we don't know exact Gregorian dates, clear all cache
+    await this.scheduleBuilder.invalidateCache();
   }
 }
