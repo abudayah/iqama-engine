@@ -67,7 +67,7 @@ describe('computeWeeklyFajrIqama (FR3-W)', () => {
     expect(result).toBe('04:00');
   });
 
-  it('caps weekly result to earliest safeSunriseLimit (P0) — the reported bug', () => {
+  it('caps weekly result to earliest safeSunriseLimit (P1) — the reported bug', () => {
     // Reproduces: Fajr 03:30, Sunrise 05:29 → safeSunriseLimit 04:29
     // Another day in the week has a later sunrise, producing a per-day iqama of 04:37
     // The weekly result must be capped to 04:29 (earliest safe limit), not 04:37

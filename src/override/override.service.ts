@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Dayjs } from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { IqamaTimes } from '../rules/rules.service';
-import {
-  ceilingToNearest5,
-  floorToNearest5,
-  formatHHmm,
-} from '../rules/time-utils';
+import { ceilingToNearest5, formatHHmm } from '../rules/time-utils';
 
 export interface Override {
   id: number;
@@ -41,15 +37,14 @@ export class OverrideService {
    * Apply overrides to the rules-computed Iqama times.
    *
    * Priority rules enforced here:
-   * - P0 (Fajr only): Iqama must never exceed Sunrise - 60 min (safeSunriseLimit).
-   *   If rounding up would breach P0, floor down to nearest 5 instead so the
-   *   result is always a clean 5-min boundary while still respecting P0.
-   * - P1: Admin override value is used instead of the FR1–FR5 calculation.
-   * - P3: All override results are rounded up to the nearest 5 minutes (CeilingToNearest5).
+   * - P0 (Admin Override): Highest priority — admin override value is used instead of the
+   *   FR1–FR5 calculation. The admin is a trusted operator who knows the Shariah requirements.
+   *   No safety ceiling is applied; the override is used as-is (after P3 rounding).
+   * - P3: All override results are rounded to the nearest 5 minutes (CeilingToNearest5).
    *
    * Override types:
-   * - FIXED: admin sets an exact HH:mm time → rounded to nearest 5, then P0 capped
-   * - OFFSET: admin sets ±N minutes relative to Azan → rounded to nearest 5, then P0 capped
+   * - FIXED: admin sets an exact HH:mm time → rounded to nearest 5
+   * - OFFSET: admin sets ±N minutes relative to Azan → rounded to nearest 5
    *
    * hasOverrides is true when at least one override was applied.
    */
@@ -57,7 +52,6 @@ export class OverrideService {
     rawAzanTimes: Record<string, Dayjs>,
     rulesIqamaTimes: IqamaTimes,
     overrides: Override[],
-    sunriseTimes?: Record<string, Dayjs>,
   ): { iqamaTimes: IqamaTimes; hasOverrides: boolean } {
     const result = { ...rulesIqamaTimes };
     let hasOverrides = false;
@@ -90,19 +84,9 @@ export class OverrideService {
 
       if (overrideTime === null) continue;
 
-      // P3: round up to nearest 5 minutes
-      let rounded = ceilingToNearest5(overrideTime);
-
-      // P0 (Fajr only): if rounding up would breach safeSunriseLimit,
-      // floor down to nearest 5 so the result is always a clean boundary
-      if (prayer === 'fajr' && sunriseTimes?.['fajr']) {
-        const safeSunriseLimit = sunriseTimes['fajr']
-          .startOf('minute')
-          .subtract(60, 'minute');
-        if (rounded.isAfter(safeSunriseLimit)) {
-          rounded = floorToNearest5(safeSunriseLimit);
-        }
-      }
+      // P3: round to nearest 5 minutes — admin override takes full priority (P0),
+      // no safety ceiling is applied; the admin is trusted to set correct times.
+      const rounded = ceilingToNearest5(overrideTime);
 
       result[prayer] = formatHHmm(rounded);
     }

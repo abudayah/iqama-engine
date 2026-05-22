@@ -4,27 +4,26 @@ import { ceilingToNearest5, floorToNearest5, formatHHmm } from './time-utils';
 /**
  * Fajr Iqama Calculation (FR3) - Dynamic with Override Support
  *
- * Priority order:
- *   P0 (safety):    Safe_Sunrise_Limit = Sunrise - 60 min  — hard ceiling, never exceeded
- *   P1 (override):  Admin overrides handled by the caller before invoking this function
+ * Priority order (applies to the calculated path only — admin overrides bypass this entirely):
+ *   P1 (safety):    Safe_Sunrise_Limit = Sunrise - 60 min  — hard ceiling, never exceeded
  *   P2 (logic):     Base_Target = min(Max_Delay, Safe_Sunrise_Limit)
  *                   Max_Delay = Azan + 75 min
  *                   if Base_Target < Azan + 10 min: Base_Target = Azan + 10 min
- *                   (floor clamp is re-capped to Safe_Sunrise_Limit so P0 always wins)
+ *                   (floor clamp is re-capped to Safe_Sunrise_Limit so P1 always wins)
  *   P3 (rounding):  Iqama = CeilingToNearest5(Base_Target)
- *                   (result is re-capped to Safe_Sunrise_Limit so rounding never breaches P0)
+ *                   (result is re-capped to Safe_Sunrise_Limit so rounding never breaches P1)
  *
- * ADMIN OVERRIDES:
+ * ADMIN OVERRIDES (P0):
  * For periods where you want fixed times (e.g., Ramadan, summer months),
  * use the admin override API to set specific Fajr Iqama times.
- * Overrides take precedence over this calculation.
+ * Overrides take full priority — no safety ceiling is applied.
  */
 export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
   // Strip seconds for clean minute-based calculations
   const fajrAzanClean = fajrAzan.startOf('minute');
   const sunriseClean = sunrise.startOf('minute');
 
-  // P0: hard safety ceiling — Iqama must never reach within 60 min of sunrise
+  // P1: hard safety ceiling — Iqama must never reach within 60 min of sunrise
   const safeSunriseLimit = sunriseClean.subtract(60, 'minute');
 
   // P2: core calculation
@@ -34,17 +33,17 @@ export function computeFajrIqama(fajrAzan: Dayjs, sunrise: Dayjs): string {
     ? maxDelay
     : safeSunriseLimit;
 
-  // P2: floor clamp — at least 10 min after Azan, but never past the P0 ceiling
+  // P2: floor clamp — at least 10 min after Azan, but never past the P1 ceiling
   const floorClamp = fajrAzanClean.add(10, 'minute');
   if (baseTarget.isBefore(floorClamp)) {
     baseTarget = floorClamp.isBefore(safeSunriseLimit)
       ? floorClamp
-      : safeSunriseLimit; // P0 wins over floor clamp
+      : safeSunriseLimit; // P1 wins over floor clamp
   }
 
   // P3: round up to nearest 5 min.
-  // If rounding up would breach the P0 ceiling, floor down to nearest 5 instead
-  // so the result is always a clean 5-min boundary while still respecting P0.
+  // If rounding up would breach the P1 ceiling, floor down to nearest 5 instead
+  // so the result is always a clean 5-min boundary while still respecting P1.
   const rounded = ceilingToNearest5(baseTarget);
   const result = rounded.isAfter(safeSunriseLimit)
     ? floorToNearest5(safeSunriseLimit)
@@ -87,7 +86,7 @@ export function computeWeeklyFajrIqama(weekDays: WeeklyFajrEntry[]): string {
     .map(({ fajrAzan, sunrise }) => computeFajrIqama(fajrAzan, sunrise))
     .reduce((acc, current) => (current > acc ? current : acc));
 
-  // Step 3 (P0): find the minimum safeSunriseLimit string across all days.
+  // Step 3 (P1): find the minimum safeSunriseLimit string across all days.
   // HH:mm string comparison is safe here (zero-padded 24-hour format).
   // This is the hard ceiling the weekly fixed time must never exceed.
   const minSafeLimitStr = weekDays
@@ -97,13 +96,13 @@ export function computeWeeklyFajrIqama(weekDays: WeeklyFajrEntry[]): string {
     .reduce((min, current) => (current < min ? current : min));
 
   if (latest <= minSafeLimitStr) {
-    // Latest per-day is already within P0 for every day — use it as-is.
+    // Latest per-day is already within P1 for every day — use it as-is.
     return latest;
   }
 
-  // Weekly result exceeds P0 for at least one day.
+  // Weekly result exceeds P1 for at least one day.
   // Floor down to nearest 5 within the minimum safe limit so the result is
-  // always a clean 5-min boundary while still respecting P0 for every day.
+  // always a clean 5-min boundary while still respecting P1 for every day.
   const [h, m] = minSafeLimitStr.split(':').map(Number);
   const floored = Math.floor(m / 5) * 5;
   return `${String(h).padStart(2, '0')}:${String(floored).padStart(2, '0')}`;
