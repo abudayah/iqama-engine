@@ -9,7 +9,7 @@ export function ceilingToNearest5(dayjsObj: Dayjs): Dayjs {
   const s = dayjsObj.second();
   const totalMinutes = m + (s > 0 ? 1 : 0); // sub-minute → next minute
   const rounded = Math.ceil(totalMinutes / 5) * 5;
-  return dayjsObj.startOf('minute').minute(rounded).second(0);
+  return dayjsObj.second(0).millisecond(0).minute(rounded);
 }
 
 /**
@@ -19,7 +19,7 @@ export function ceilingToNearest5(dayjsObj: Dayjs): Dayjs {
 export function floorToNearest5(dayjsObj: Dayjs): Dayjs {
   const m = dayjsObj.minute();
   const floored = Math.floor(m / 5) * 5;
-  return dayjsObj.startOf('minute').minute(floored).second(0);
+  return dayjsObj.second(0).millisecond(0).minute(floored);
 }
 
 /**
@@ -31,7 +31,7 @@ export function ceilingToNearest30(dayjsObj: Dayjs): Dayjs {
   const s = dayjsObj.second();
   const totalMinutes = m + (s > 0 ? 1 : 0); // sub-minute → next minute
   const rounded = Math.ceil(totalMinutes / 30) * 30;
-  return dayjsObj.startOf('minute').minute(rounded).second(0);
+  return dayjsObj.second(0).millisecond(0).minute(rounded);
 }
 
 /**
