@@ -5,7 +5,6 @@ import {
   CalculationMethod,
   PrayerTimes,
   Madhab,
-  Rounding,
   HighLatitudeRule,
 } from 'adhan';
 import { Dayjs } from 'dayjs';
@@ -37,11 +36,14 @@ export class AdhanAdapter {
 
     const params = CalculationMethod.NorthAmerica();
     params.madhab = Madhab.Shafi;
-    params.rounding = Rounding.None;
-    // High latitude adjustment: TwilightAngle restricts Isha (and Fajr) in summer
-    // months (Jun–Jul) when the 15° twilight angle never fully disappears at ~49°N.
-    // Has zero effect on all other months — times are identical to the raw calculation.
+
+    const month = date.getMonth() + 1;
+    if (month >= 5 && month <= 7) {
+      params.methodAdjustments.isha = -6;
+    }
+
     params.highLatitudeRule = HighLatitudeRule.TwilightAngle;
+
     const pt = new PrayerTimes(coordinates, date, params);
 
     return {
