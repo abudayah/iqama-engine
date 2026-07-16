@@ -151,6 +151,16 @@ export class AdminController {
   }
 
   /**
+   * Clear the entire in-memory schedule cache
+   * DELETE /api/v1/admin/cache
+   */
+  @Delete('cache')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clearCache() {
+    await this.scheduleBuilder.invalidateCache();
+  }
+
+  /**
    * Soft-delete all active overrides (use with caution)
    * DELETE /api/v1/admin/overrides
    */
