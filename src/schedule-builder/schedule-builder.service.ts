@@ -229,21 +229,19 @@ export class ScheduleBuilderService {
    */
   async invalidateCache(startDate?: string, endDate?: string): Promise<void> {
     if (!startDate && !endDate) {
-      // Clear all cache by deleting all keys with schedule: prefix
-      // Note: cache-manager doesn't have reset(), so we'll use store.reset() if available
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const store = (this.cacheManager as any).store;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (store && typeof store.reset === 'function') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        await store.reset();
-      }
+      // Clear all cached schedules. cache-manager v5+ exposes .clear() directly
+      // on the cache instance (store.reset() does not exist in this version).
+      await this.cacheManager.clear();
       return;
     }
 
-    // Invalidate specific months affected by the date range
-    const start = dayjs(startDate);
-    const end = dayjs(endDate || startDate);
+    // Invalidate specific months affected by the date range.
+    // Strip to YYYY-MM-DD before parsing to avoid UTC→local timezone shifts
+    // that could cause dayjs to land on the wrong calendar day/month.
+    const startDateStr = startDate!.substring(0, 10);
+    const endDateStr = (endDate || startDate)!.substring(0, 10);
+    const start = dayjs(startDateStr);
+    const end = dayjs(endDateStr);
 
     const monthsToInvalidate = new Set<string>();
     let current = start.startOf('month');
