@@ -36,6 +36,9 @@ Thumbs.db
 
 # Prisma
 /generated/prisma
+prisma/db.sqlite
+prisma/db.sqlite-shm
+prisma/db.sqlite-wal
 
 # Cache
 .cache/
