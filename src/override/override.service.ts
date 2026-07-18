@@ -21,16 +21,17 @@ export class OverrideService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getOverridesForDate(date: string): Promise<Override[]> {
-    // Parse YYYY-MM-DD to a Date at midnight UTC for comparison
-    const dateObj = new Date(`${date}T00:00:00.000Z`);
-
-    return this.prisma.override.findMany({
-      where: {
-        startDate: { lte: dateObj },
-        endDate: { gte: dateObj },
-        deletedAt: null,
-      },
-    });
+    // SQLite stores DateTime as "YYYY-MM-DDTHH:mm:ss.sss+00:00".
+    // Prisma serializes JS Date objects as "YYYY-MM-DD HH:mm:ss.sss" for SQLite
+    // queries, which breaks lte/gte comparisons because space (ASCII 32) < 'T' (84),
+    // making stored dates appear greater than query dates.
+    // Fix: use raw SQL comparing the YYYY-MM-DD prefix, which is format-agnostic.
+    return this.prisma.$queryRaw<Override[]>`
+      SELECT * FROM "Override"
+      WHERE substr("startDate", 1, 10) <= ${date}
+        AND substr("endDate",   1, 10) >= ${date}
+        AND "deletedAt" IS NULL
+    `;
   }
 
   /**
