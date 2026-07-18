@@ -250,8 +250,8 @@ MASJID_TIMEZONE=America/Vancouver
 # Database
 DATABASE_URL=mysql://user:password@localhost:3306/iqama
 
-# Admin API Security
-ADMIN_API_KEY=your-secure-random-key
+# Admin Security
+ADMIN_PASSWORD=your-secure-password
 ```
 
 4. **Set up the database**
@@ -374,10 +374,10 @@ npx prisma migrate deploy
 
 ### Admin API Security
 
-Protect admin endpoints with an API key:
+Protect admin endpoints with a password:
 
 ```env
-ADMIN_API_KEY=your-secure-random-key
+ADMIN_PASSWORD=your-secure-password
 ```
 
 Generate a secure key:
@@ -392,7 +392,7 @@ openssl rand -hex 32
 
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure production database
-- [ ] Generate secure `ADMIN_API_KEY`
+- [ ] Set a secure `ADMIN_PASSWORD`
 - [ ] Configure reverse proxy (nginx, Caddy)
 - [ ] Set up SSL/TLS certificates
 - [ ] Configure logging and monitoring

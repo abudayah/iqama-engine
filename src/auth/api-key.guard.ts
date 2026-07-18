@@ -13,22 +13,22 @@ export class ApiKeyGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const apiKey = request.headers['x-api-key'];
+    const password = request.headers['x-api-key'];
 
-    const validApiKey = this.configService.get<string>('ADMIN_API_KEY');
+    const validPassword = this.configService.get<string>('ADMIN_PASSWORD');
 
-    if (!validApiKey) {
+    if (!validPassword) {
       throw new UnauthorizedException(
-        'Admin API key is not configured on the server',
+        'Admin password is not configured on the server',
       );
     }
 
-    if (!apiKey) {
-      throw new UnauthorizedException('API key is required');
+    if (!password) {
+      throw new UnauthorizedException('Password is required');
     }
 
-    if (apiKey !== validApiKey) {
-      throw new UnauthorizedException('Invalid API key');
+    if (password !== validPassword) {
+      throw new UnauthorizedException('Invalid password');
     }
 
     return true;

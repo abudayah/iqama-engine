@@ -46,7 +46,7 @@ describe('ApiKeyGuard', () => {
       const result = guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(configService.get).toHaveBeenCalledWith('ADMIN_API_KEY');
+      expect(configService.get).toHaveBeenCalledWith('ADMIN_PASSWORD');
     });
 
     it('should throw UnauthorizedException when API key is not configured', () => {

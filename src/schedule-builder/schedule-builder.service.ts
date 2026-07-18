@@ -208,8 +208,19 @@ export class ScheduleBuilderService {
   }
 
   async getMonth(yearMonth: string): Promise<DailySchedule[]> {
-    // Cache temporarily disabled — always build fresh
-    return this.buildMonth(yearMonth);
+    const cacheKey = `schedule:${yearMonth}`;
+
+    // Try to get from cache first
+    const cached = await this.cacheManager.get<DailySchedule[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Build and cache
+    const schedules = await this.buildMonth(yearMonth);
+    await this.cacheManager.set(cacheKey, schedules);
+
+    return schedules;
   }
 
   /**

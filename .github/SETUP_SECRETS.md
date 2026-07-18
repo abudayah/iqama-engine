@@ -10,10 +10,10 @@ This guide explains how to configure environment variables for the GitHub Action
 
 Navigate to: **Repository Settings → Secrets and variables → Actions → Secrets**
 
-| Secret Name     | Description                        | Example                               |
-| --------------- | ---------------------------------- | ------------------------------------- |
-| `DATABASE_URL`  | MySQL connection string for Prisma | `mysql://user:pass@host:3306/iqama`   |
-| `ADMIN_API_KEY` | API key for admin endpoints        | Generate with: `openssl rand -hex 32` |
+| Secret Name      | Description                        | Example                             |
+| ---------------- | ---------------------------------- | ----------------------------------- |
+| `DATABASE_URL`   | MySQL connection string for Prisma | `mysql://user:pass@host:3306/iqama` |
+| `ADMIN_PASSWORD` | Password for admin endpoints       | Choose a strong password            |
 
 #### **Variables** (Non-Sensitive Configuration)
 

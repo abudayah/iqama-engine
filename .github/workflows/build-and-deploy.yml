@@ -46,7 +46,7 @@ jobs:
           MASJID_LONGITUDE: ${{ vars.MASJID_LONGITUDE }}
           MASJID_TIMEZONE: ${{ vars.MASJID_TIMEZONE }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
         run: npm run build
 
@@ -89,7 +89,7 @@ jobs:
           MASJID_LONGITUDE: ${{ vars.MASJID_LONGITUDE }}
           MASJID_TIMEZONE: ${{ vars.MASJID_TIMEZONE }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
         run: npm run build
 
