@@ -5,6 +5,19 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Disable nginx/proxy caching for all API responses
+  app.use(
+    (
+      _req: unknown,
+      res: { setHeader: (k: string, v: string) => void },
+      next: () => void,
+    ) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      next();
+    },
+  );
+
   // CORS — driven by CORS_ORIGIN env variable.
   // Accepts a comma-separated list of allowed origins, or '*' for open access.
   // Example: CORS_ORIGIN=http://localhost:5173,https://prayers.example.com
