@@ -17,7 +17,7 @@ import { join } from 'path';
     }),
     CacheModule.register({
       isGlobal: true,
-      ttl: 0, // No TTL - cache indefinitely until manually invalidated
+      ttl: 10 * 60 * 1000, // 10-minute safety-net TTL (ms for cache-manager v5)
       max: 100, // Store up to 100 months in cache
     }),
     ScheduleModule,

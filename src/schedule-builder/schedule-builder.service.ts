@@ -51,6 +51,18 @@ function isAstronomicalEidDay(date: Dayjs): boolean {
 export class ScheduleBuilderService {
   private readonly timezone: string;
 
+  /**
+   * In-flight build tracker — keyed by cache key ("schedule:YYYY-MM").
+   *
+   * When multiple concurrent requests arrive for the same uncached month,
+   * only one `buildMonth()` runs; the rest await the same Promise.
+   * This also closes the stale-write race: if `invalidateCache` fires and
+   * deletes a key while a build is still in-flight, the in-flight entry is
+   * removed from this map by `invalidateCache` so its eventual `set()` is
+   * suppressed (the Promise resolves to the data but we skip the cache write).
+   */
+  private readonly inFlight = new Map<string, Promise<DailySchedule[]>>();
+
   constructor(
     private readonly adhanAdapter: AdhanAdapter,
     private readonly rulesService: RulesService,
@@ -255,27 +267,51 @@ export class ScheduleBuilderService {
   async getMonth(yearMonth: string): Promise<DailySchedule[]> {
     const cacheKey = `schedule:${yearMonth}`;
 
-    // Try to get from cache first
+    // 1. Cache hit — return immediately.
     const cached = await this.cacheManager.get<DailySchedule[]>(cacheKey);
     if (cached) {
       return cached;
     }
 
-    // Build and cache
-    const schedules = await this.buildMonth(yearMonth);
-    await this.cacheManager.set(cacheKey, schedules);
+    // 2. Already building this month — join the in-flight promise instead of
+    //    starting a second redundant build (thundering-herd protection).
+    const existing = this.inFlight.get(cacheKey);
+    if (existing) {
+      return existing;
+    }
 
-    return schedules;
+    // 3. Start a new build and register it so concurrent callers can share it.
+    const build = this.buildMonth(yearMonth).then(async (schedules) => {
+      // Only write to cache if this build is still the "current" one for this
+      // key.  If invalidateCache() ran while we were building, it will have
+      // removed this entry from inFlight — in that case we skip the set() so
+      // the stale result never lands in cache.
+      if (this.inFlight.get(cacheKey) === build) {
+        await this.cacheManager.set(cacheKey, schedules);
+        this.inFlight.delete(cacheKey);
+      }
+      return schedules;
+    });
+
+    // Store *before* awaiting so any concurrent callers that arrive while
+    // buildMonth is running will find and share this promise.
+    this.inFlight.set(cacheKey, build);
+
+    return build;
   }
 
   /**
    * Invalidate cache for affected months when overrides or special prayers change.
    * Called by admin operations.
+   *
+   * Also removes any in-flight build promises for the affected months so that
+   * a build which started before this invalidation cannot write stale data back
+   * into the cache after the invalidation completes.
    */
   async invalidateCache(startDate?: string, endDate?: string): Promise<void> {
     if (!startDate && !endDate) {
-      // Clear all cached schedules. cache-manager v5+ exposes .clear() directly
-      // on the cache instance (store.reset() does not exist in this version).
+      // Clear all cached schedules and all in-flight builds.
+      this.inFlight.clear();
       await this.cacheManager.clear();
       return;
     }
@@ -297,7 +333,11 @@ export class ScheduleBuilderService {
     }
 
     for (const yearMonth of monthsToInvalidate) {
-      await this.cacheManager.del(`schedule:${yearMonth}`);
+      const cacheKey = `schedule:${yearMonth}`;
+      // Remove the in-flight promise first so any pending build's then()
+      // callback sees the key is gone and skips the cache write.
+      this.inFlight.delete(cacheKey);
+      await this.cacheManager.del(cacheKey);
     }
   }
 }
