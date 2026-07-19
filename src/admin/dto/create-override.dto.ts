@@ -4,7 +4,46 @@ import {
   IsDateString,
   Matches,
   ValidateIf,
+  ValidationArguments,
+  registerDecorator,
+  ValidationOptions,
 } from 'class-validator';
+
+/**
+ * Custom decorator: the decorated property (endDate) must be >= the sibling
+ * property named by `property` (startDate).
+ */
+function IsDateAfterOrEqual(
+  property: string,
+  validationOptions?: ValidationOptions,
+) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isDateAfterOrEqual',
+      target: (object as { constructor: new (...args: unknown[]) => unknown })
+        .constructor,
+      propertyName,
+      constraints: [property],
+      options: validationOptions,
+      validator: {
+        validate(value: unknown, args: ValidationArguments) {
+          const [relatedPropertyName] = args.constraints as [string];
+          const relatedValue = (args.object as Record<string, unknown>)[
+            relatedPropertyName
+          ];
+          if (typeof value !== 'string' || typeof relatedValue !== 'string') {
+            return true; // let @IsDateString handle format errors
+          }
+          return value >= relatedValue;
+        },
+        defaultMessage(args: ValidationArguments) {
+          const [relatedPropertyName] = args.constraints as [string];
+          return `${args.property} must be on or after ${relatedPropertyName}`;
+        },
+      },
+    });
+  };
+}
 
 export class CreateOverrideDto {
   @IsString()
@@ -30,5 +69,8 @@ export class CreateOverrideDto {
   startDate: string; // YYYY-MM-DD
 
   @IsDateString()
+  @IsDateAfterOrEqual('startDate', {
+    message: 'endDate must be on or after startDate',
+  })
   endDate: string; // YYYY-MM-DD
 }

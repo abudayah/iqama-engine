@@ -54,7 +54,7 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 │                      Data Layer                              │
 │  ┌──────────────────┐         ┌──────────────────┐         │
 │  │ Schedule Builder │         │ Prisma Service   │         │
-│  │ Service          │         │ (MySQL)          │         │
+│  │ Service          │         │ (SQLite)         │         │
 │  └──────────────────┘         └──────────────────┘         │
 └─────────────────────────────────────────────────────────────┘
                     │                       │
@@ -62,7 +62,7 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 ┌─────────────────────────────────────────────────────────────┐
 │                   External Services                          │
 │  ┌──────────────────────────────────────────────────────────┤
-│  │ MySQL Database                                           │
+│  │ SQLite Database                                          │
 │  └──────────────────────────────────────────────────────────┘
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -174,7 +174,7 @@ Content-Type: application/json
 
 {
   "prayer": "fajr",
-  "overrideType": "iqama",
+  "overrideType": "FIXED",
   "value": "05:00",
   "startDate": "2026-06-01",
   "endDate": "2026-06-30"
@@ -214,7 +214,6 @@ X-API-Key: your-admin-api-key
 ### Prerequisites
 
 - Node.js 18+ and npm
-- MySQL database
 
 ### Setup
 
@@ -247,8 +246,8 @@ MASJID_LATITUDE=49.2514
 MASJID_LONGITUDE=-122.7740
 MASJID_TIMEZONE=America/Vancouver
 
-# Database
-DATABASE_URL=mysql://user:password@localhost:3306/iqama
+# Database (SQLite)
+DATABASE_URL=file:./prisma/db.sqlite
 
 # Admin Security
 ADMIN_PASSWORD=your-secure-password
@@ -291,11 +290,10 @@ iqama-engine/
 │   ├── prisma/             # Database service
 │   ├── rules/              # Prayer calculation rules
 │   │   ├── fajr.rule.ts
-│   │   ├── dhuhr.rule.ts
+│   │   ├── dhuhr.rule.ts   # includes Friday block logic
 │   │   ├── asr.rule.ts
 │   │   ├── maghrib.rule.ts
 │   │   ├── isha.rule.ts
-│   │   ├── friday-block.rule.ts
 │   │   └── time-utils.ts
 │   ├── schedule/           # Schedule endpoints & service
 │   ├── app.module.ts
@@ -360,10 +358,10 @@ These values are used for astronomical calculations via the `adhan` library.
 
 ### Database
 
-The service uses MySQL with Prisma ORM. Configure the connection string:
+The service uses SQLite with Prisma ORM. Configure the database path:
 
 ```env
-DATABASE_URL=mysql://user:password@localhost:3306/iqama
+DATABASE_URL=file:./prisma/db.sqlite
 ```
 
 Run migrations:
@@ -391,12 +389,12 @@ openssl rand -hex 32
 ### Production Checklist
 
 - [ ] Set `NODE_ENV=production`
-- [ ] Configure production database
-- [ ] Set a secure `ADMIN_PASSWORD`
+- [ ] Configure production database (SQLite file or migrate to a managed DB)
+  - [ ] Set a secure `ADMIN_PASSWORD`
 - [ ] Configure reverse proxy (nginx, Caddy)
 - [ ] Set up SSL/TLS certificates
 - [ ] Configure logging and monitoring
-- [ ] Set up automated backups for MySQL
+- [ ] Set up automated backups for the SQLite database file
 
 ### Docker Deployment
 
@@ -411,7 +409,7 @@ See `.env.example` for all available configuration options.
 The service provides a health check endpoint:
 
 ```http
-GET /health
+GET /api/v1/health
 ```
 
 **Response:**

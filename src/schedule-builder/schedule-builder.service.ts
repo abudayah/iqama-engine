@@ -35,11 +35,16 @@ function isQiyamNight(date: Dayjs): boolean {
 
 /**
  * Returns true if the given Gregorian date is an Eid day according to the
- * astronomical Hijri calendar (1st Shawwal or 10th Dhul-Hijjah).
+ * astronomical Hijri calendar.
+ * - Eid al-Fitr:  1st–3rd of Shawwal (month 10, days 1–3)
+ * - Eid al-Adha: 10th–13th of Dhul-Hijjah (month 12, days 10–13)
  */
 function isAstronomicalEidDay(date: Dayjs): boolean {
   const { month, day } = getHijriComponents(date);
-  return (month === 10 && day === 1) || (month === 12 && day === 10);
+  return (
+    (month === 10 && day >= 1 && day <= 3) ||
+    (month === 12 && day >= 10 && day <= 13)
+  );
 }
 
 @Injectable()
@@ -75,7 +80,10 @@ export class ScheduleBuilderService {
     const specialPrayers = await this.prisma.specialPrayer.findMany({
       where: { date: { gte: monthStart, lte: monthEnd } },
     });
-    // Build a map: date → { prayer1, prayer2 } for O(1) lookup
+    // Build a map: date → { prayer1, prayer2 } for O(1) lookup.
+    // Each SpecialPrayer record is stored against the first day of each Eid.
+    // We also populate the subsequent Eid days (days 2–3 for Eid al-Fitr,
+    // days 11–13 for Eid al-Adha) so they share the same admin-configured times.
     const eidByDate = new Map<string, { prayer1: string; prayer2: string }>();
     for (const sp of specialPrayers) {
       const prayers = JSON.parse(sp.prayers) as {
@@ -88,7 +96,21 @@ export class ScheduleBuilderService {
       const p2 =
         prayers.find((p) => p.label === '2nd Eid Prayer')?.time ??
         FALLBACK_EID_PRAYER_2;
-      eidByDate.set(sp.date, { prayer1: p1, prayer2: p2 });
+      const entry = { prayer1: p1, prayer2: p2 };
+
+      // Day 1 (the stored date)
+      eidByDate.set(sp.date, entry);
+
+      // Propagate to remaining Eid days:
+      // Eid al-Fitr (type EID_AL_FITR): days 1–3 → +1, +2
+      // Eid al-Adha (type EID_AL_ADHA): days 10–13 → +1, +2, +3
+      const extraDays = sp.type === 'EID_AL_ADHA' ? 3 : 2;
+      for (let offset = 1; offset <= extraDays; offset++) {
+        eidByDate.set(
+          dayjs(sp.date).add(offset, 'day').format('YYYY-MM-DD'),
+          entry,
+        );
+      }
     }
 
     const schedules: DailySchedule[] = [];
@@ -97,6 +119,28 @@ export class ScheduleBuilderService {
     const firstDay = dayjs.tz(`${yearMonth}-01`, tz);
     const hijriYear = getHijriComponents(firstDay).year;
     const qiyamConfig = await this.qiyamConfigService.getForYear(hijriYear);
+
+    // Pre-compute weekly contexts once per ISO week rather than once per day.
+    // Days in the same week share the same Friday→Thursday window, so computing
+    // the context 7× per week is wasteful.  Key = the ISO date of the Friday
+    // that starts that week.
+    const weeklyCtxCache = new Map<string, WeeklyContext>();
+
+    const getWeeklyCtx = (date: string): WeeklyContext => {
+      const d = dayjs.tz(date, tz);
+      const dayOfWeek = d.day(); // 0 Sun … 5 Fri … 6 Sat
+      const daysSinceFriday = (dayOfWeek + 2) % 7;
+      const weekFridayKey = d
+        .subtract(daysSinceFriday, 'day')
+        .format('YYYY-MM-DD');
+
+      const cached = weeklyCtxCache.get(weekFridayKey);
+      if (cached) return cached;
+
+      const ctx = this.buildWeeklyContext(date, tz);
+      weeklyCtxCache.set(weekFridayKey, ctx);
+      return ctx;
+    };
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = `${yearMonth}-${String(day).padStart(2, '0')}`;
@@ -111,8 +155,9 @@ export class ScheduleBuilderService {
       // (b) Get overrides for this day
       const overrides = await this.overrideService.getOverridesForDate(date);
 
-      // (c) Build the weekly context (Friday→Thursday window) for FR3-W / FR4-W
-      const weeklyCtx = this.buildWeeklyContext(date, tz);
+      // (c) Get the weekly context (Friday→Thursday window) for FR3-W / FR4-W.
+      //     Reuse the cached result when multiple days share the same week.
+      const weeklyCtx = getWeeklyCtx(date);
 
       // (d) Compute iqama times via FR1–FR4 (weekly rules for Fajr & Isha)
       const iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);

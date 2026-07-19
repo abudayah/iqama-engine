@@ -7,10 +7,21 @@ import { HijriCalendarStatusDto } from './dto/hijri-calendar-status.dto';
 import { SubmitOverrideDto } from './dto/submit-override.dto';
 import { EidPrayerRecordDto } from './dto/eid-prayer-record.dto';
 
-// Pure helper — returns true only when today IS the Eid day (diff === 0)
+/**
+ * Returns true when `today` is within the 3-day approach window leading up to
+ * (and including) `eidDate`.  That is, diff ∈ {0, 1, 2, 3} where diff is the
+ * number of days from today until Eid.
+ *
+ * Examples:
+ *   today = eidDate - 3 → diff = 3 → true  (first day of approach window)
+ *   today = eidDate - 1 → diff = 1 → true
+ *   today = eidDate     → diff = 0 → true  (Eid day itself)
+ *   today = eidDate - 4 → diff = 4 → false (too early)
+ *   today = eidDate + 1 → diff = -1 → false (past Eid)
+ */
 export function isInApproachWindow(today: string, eidDate: string): boolean {
   const diff = dayjs(eidDate).diff(dayjs(today), 'day');
-  return diff === 0;
+  return diff >= 0 && diff <= 3;
 }
 
 // Task 2.2: Astronomical fallback prayer times (placeholder)

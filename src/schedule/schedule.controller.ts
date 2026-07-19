@@ -2,6 +2,10 @@ import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { ScheduleQueryDto } from './dto/schedule-query.dto';
 import { DailySchedule } from './daily-schedule.interface';
+import dayjs from '../dayjs';
+
+/** Maximum allowed date range for range queries (inclusive). */
+const MAX_RANGE_DAYS = 366;
 
 @Controller('api/v1/schedule')
 export class ScheduleController {
@@ -39,6 +43,16 @@ export class ScheduleController {
       throw new BadRequestException(
         "'start_date' must not be after 'end_date'",
       );
+    }
+
+    // Cap range to prevent unbounded schedule generation
+    if (start_date && end_date) {
+      const rangeDays = dayjs(end_date).diff(dayjs(start_date), 'day') + 1;
+      if (rangeDays > MAX_RANGE_DAYS) {
+        throw new BadRequestException(
+          `Date range must not exceed ${MAX_RANGE_DAYS} days (requested ${rangeDays})`,
+        );
+      }
     }
 
     if (date) {

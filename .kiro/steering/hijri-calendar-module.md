@@ -74,7 +74,12 @@ if (isAstronomicalEidDay(date)) {
 }
 ```
 
-**`isAstronomicalEidDay` rule**: 1st Shawwal (month 10, day 1) OR 10th Dhul-Hijjah (month 12, day 10).
+**`isAstronomicalEidDay` rule**:
+
+- **Eid al-Fitr**: 1st–3rd of Shawwal (month 10, days 1–3)
+- **Eid al-Adha**: 10th–13th of Dhul-Hijjah (month 12, days 10–13)
+
+The `SpecialPrayer` record is stored against the **first day** of each Eid. `buildMonth()` propagates the same prayer times to all subsequent Eid days (+1, +2 for Fitr; +1, +2, +3 for Adha).
 
 Fallback times when no `SpecialPrayer` record exists: `07:00` / `08:30`.
 

@@ -31,6 +31,7 @@ export class OverrideService {
       WHERE substr("startDate", 1, 10) <= ${date}
         AND substr("endDate",   1, 10) >= ${date}
         AND "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
     `;
   }
 
