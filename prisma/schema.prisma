@@ -49,3 +49,47 @@ model QiyamConfig {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+// ── Adhan Configuration ───────────────────────────────────────────────────────
+
+/// Base Adhan configuration, append-only, versioned by effective date.
+/// The resolver picks the version with the greatest effectiveFrom <= requested date.
+model AdhanConfigVersion {
+  id            Int      @id @default(autoincrement())
+  effectiveFrom String   // 'YYYY-MM-DD' in masjid timezone
+  settings      String   // JSON (AdhanSettings), validated on write
+  reason        String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@index([effectiveFrom])
+}
+
+/// Sparse, date-ranged Adhan configuration (e.g. Ramadan, summer high-latitude).
+/// Fields present in a period override corresponding base fields for dates in range.
+model AdhanConfigPeriod {
+  id        Int      @id @default(autoincrement())
+  label     String
+  startDate String   // 'YYYY-MM-DD'
+  endDate   String   // 'YYYY-MM-DD'
+  settings  String   // JSON (partial AdhanSettings), validated on write
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // soft-delete
+
+  @@index([startDate, endDate])
+}
+
+/// Immutable audit trail for every create/update/delete/revert on the two tables above.
+model AdhanConfigAudit {
+  id        Int      @id @default(autoincrement())
+  entity    String   // 'VERSION' | 'PERIOD'
+  entityId  Int
+  action    String   // 'CREATE' | 'UPDATE' | 'DELETE' | 'REVERT'
+  before    String?  // JSON snapshot before change
+  after     String?  // JSON snapshot after change
+  actor     String
+  reason    String?
+  createdAt DateTime @default(now())
+}

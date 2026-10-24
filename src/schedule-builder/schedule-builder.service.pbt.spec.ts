@@ -77,6 +77,12 @@ describe('ScheduleBuilderService — Property-Based Tests', () => {
       specialPrayer: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      adhanConfigVersion: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      adhanConfigPeriod: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     const mockQiyamConfigService = {

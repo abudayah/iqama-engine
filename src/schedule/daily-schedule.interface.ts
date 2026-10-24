@@ -19,7 +19,7 @@ export interface DailySchedule {
   eid_prayer_2?: string; // HH:mm — 2nd Eid prayer
   qiyam_time?: string; // HH:mm
   metadata: {
-    calculation_method: 'ISNA';
+    calculation_method: string; // e.g. 'NorthAmerica' (ISNA), 'MuslimWorldLeague', etc.
     has_overrides: boolean;
   };
 }

@@ -17,6 +17,11 @@ import {
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
+import { resolveAdhanSettings } from '../adhan-config/adhan-config.resolver';
+import type {
+  AdhanConfigVersionRecord,
+  AdhanConfigPeriodRecord,
+} from '../adhan-config/adhan-config.types';
 
 /** Placeholder Eid prayer times used when no SpecialPrayer record has been saved */
 const FALLBACK_EID_PRAYER_1 = '07:00';
@@ -75,12 +80,36 @@ export class ScheduleBuilderService {
     this.timezone = this.configService.get<string>('app.masjidTimezone')!;
   }
 
+  /** Load all adhan config versions and active periods from DB. */
+  private async loadAdhanConfig(): Promise<{
+    versions: AdhanConfigVersionRecord[];
+    periods: AdhanConfigPeriodRecord[];
+  }> {
+    const [versions, periods] = await Promise.all([
+      this.prisma.adhanConfigVersion.findMany({
+        orderBy: { effectiveFrom: 'asc' },
+      }),
+      this.prisma.adhanConfigPeriod.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    return {
+      versions: versions,
+      periods: periods,
+    };
+  }
+
   /**
    * Build the full array of DailySchedule objects for a given month.
    * @param yearMonth - "YYYY-MM" string
    */
   async buildMonth(yearMonth: string): Promise<DailySchedule[]> {
     const tz = this.timezone;
+
+    // Load adhan config once per month build
+    const adhanConfig = await this.loadAdhanConfig();
+    const hasConfig = adhanConfig.versions.length > 0;
 
     // Determine the number of days in the month
     const daysInMonth = dayjs.tz(`${yearMonth}-01`, tz).daysInMonth();
@@ -162,7 +191,26 @@ export class ScheduleBuilderService {
       // library receives the correct calendar date regardless of the server's
       // system timezone.
       const dateObj = dayjs.tz(`${date}T12:00:00`, tz).toDate();
-      const raw = this.adhanAdapter.getPrayerTimes(dateObj);
+
+      let raw: ReturnType<typeof this.adhanAdapter.getPrayerTimes>;
+      let effectiveMethod = 'ISNA';
+
+      if (hasConfig) {
+        try {
+          const resolved = resolveAdhanSettings(
+            date,
+            adhanConfig.versions,
+            adhanConfig.periods,
+          );
+          raw = this.adhanAdapter.getPrayerTimesFromConfig(dateObj, resolved);
+          effectiveMethod = resolved.general.method;
+        } catch {
+          // Fallback to legacy adapter if resolver fails (shouldn't happen with seed)
+          raw = this.adhanAdapter.getPrayerTimes(dateObj);
+        }
+      } else {
+        raw = this.adhanAdapter.getPrayerTimes(dateObj);
+      }
 
       // (b) Get overrides for this day
       const overrides = await this.overrideService.getOverridesForDate(date);
@@ -218,7 +266,7 @@ export class ScheduleBuilderService {
           ? { qiyam_time: qiyamConfig.start_time }
           : {}),
         metadata: {
-          calculation_method: 'ISNA',
+          calculation_method: effectiveMethod,
           has_overrides: hasOverrides,
         },
       };

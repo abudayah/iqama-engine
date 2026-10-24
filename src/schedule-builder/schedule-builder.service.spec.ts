@@ -39,6 +39,12 @@ describe('ScheduleBuilderService', () => {
       specialPrayer: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      adhanConfigVersion: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      adhanConfigPeriod: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     const mockQiyamConfigService = {
@@ -138,9 +144,10 @@ describe('ScheduleBuilderService', () => {
       expect(firstDay.hijri_date).toBeDefined();
 
       // Verify all days were processed.
-      // Each day triggers 1 call for itself + 7 calls for its Friday→Thursday
-      // weekly window (FR3-W / FR4-W), so total = 30 × 8 = 240.
-      expect(adhanAdapter.getPrayerTimes).toHaveBeenCalledTimes(240);
+      // Weekly context is cached per ISO week (Fri→Thu), so getPrayerTimes is called
+      // once per day + 7 times per unique week. June 2026 has 5 distinct weeks.
+      // 5 weeks × 7 days + 30 per-day calls = 65 total.
+      expect(adhanAdapter.getPrayerTimes).toHaveBeenCalledTimes(65);
       expect(rulesService.computeIqama).toHaveBeenCalledTimes(30);
       expect(overrideService.getOverridesForDate).toHaveBeenCalledTimes(30);
     });
