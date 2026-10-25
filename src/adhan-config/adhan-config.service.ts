@@ -192,6 +192,8 @@ export class AdhanConfigService {
       recommendedHighLatitudeRule,
       today,
       timezone: this.timezone,
+      latitude: lat,
+      longitude: lon,
     };
   }
 
