@@ -20,6 +20,9 @@ echo "Generating Prisma Client..."
 echo "Running database migrations..."
 /opt/cpanel/ea-nodejs22/bin/npx prisma migrate deploy
 
+echo "Seeding initial Adhan configuration (idempotent)..."
+/opt/cpanel/ea-nodejs22/bin/npx prisma db seed
+
 echo "Building application..."
 /opt/cpanel/ea-nodejs22/bin/npm run build
 
