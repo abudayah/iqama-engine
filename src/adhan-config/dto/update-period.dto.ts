@@ -20,8 +20,4 @@ export class UpdatePeriodDto {
   /** Confirmation token from POST /preview */
   @IsString()
   previewId: string;
-
-  @IsOptional()
-  @IsString()
-  reason?: string;
 }

@@ -58,7 +58,6 @@ model AdhanConfigVersion {
   id            Int      @id @default(autoincrement())
   effectiveFrom String   // 'YYYY-MM-DD' in masjid timezone
   settings      String   // JSON (AdhanSettings), validated on write
-  reason        String?
   createdBy     String
   createdAt     DateTime @default(now())
 
@@ -79,17 +78,4 @@ model AdhanConfigPeriod {
   deletedAt DateTime? // soft-delete
 
   @@index([startDate, endDate])
-}
-
-/// Immutable audit trail for every create/update/delete/revert on the two tables above.
-model AdhanConfigAudit {
-  id        Int      @id @default(autoincrement())
-  entity    String   // 'VERSION' | 'PERIOD'
-  entityId  Int
-  action    String   // 'CREATE' | 'UPDATE' | 'DELETE' | 'REVERT'
-  before    String?  // JSON snapshot before change
-  after     String?  // JSON snapshot after change
-  actor     String
-  reason    String?
-  createdAt DateTime @default(now())
 }
