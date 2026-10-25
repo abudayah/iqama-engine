@@ -43,7 +43,6 @@ async function main() {
     data: {
       effectiveFrom: '1970-01-01',
       settings: JSON.stringify(baseSettings),
-      reason: 'Initial seed — matches previous hardcoded ISNA configuration',
       createdBy: 'seed',
     },
   });
