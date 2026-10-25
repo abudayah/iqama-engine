@@ -171,11 +171,11 @@ function buildEntry(
     ishaAngle:
       params.ishaAngle !== undefined &&
       params.ishaAngle !== 0 &&
-      params.ishaInterval === undefined
+      !(params as unknown as { ishaInterval?: number }).ishaInterval
         ? params.ishaAngle
         : null,
     ishaInterval:
-      (params as unknown as { ishaInterval?: number }).ishaInterval ?? null,
+      (params as unknown as { ishaInterval?: number }).ishaInterval || null,
     maghribAngle:
       params.maghribAngle !== undefined && params.maghribAngle !== 0
         ? params.maghribAngle

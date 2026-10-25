@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { Dayjs } from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { IqamaTimes } from '../rules/rules.service';
-import { ceilingToNearest5, formatHHmm } from '../rules/time-utils';
+import {
+  ceilingToNearest5,
+  formatHHmm,
+  setTimeInTz,
+} from '../rules/time-utils';
 
 export interface Override {
   id: number;
@@ -68,13 +72,11 @@ export class OverrideService {
       if (override.overrideType === 'FIXED') {
         const azan = rawAzanTimes[prayer];
         if (!azan) continue;
-        // Parse HH:mm into a Dayjs on the same date as the Azan
+        // Parse HH:mm into a Dayjs on the same date as the Azan.
+        // Use setTimeInTz() instead of bare .hour()/.minute()/.second() setters
+        // because dayjs-hijri overwrites .set() and drops $x.$timezone.
         const [hours, minutes] = override.value.split(':').map(Number);
-        overrideTime = azan
-          .startOf('day')
-          .hour(hours)
-          .minute(minutes)
-          .second(0);
+        overrideTime = setTimeInTz(azan, hours, minutes, 0);
         hasOverrides = true;
       } else if (override.overrideType === 'OFFSET') {
         const azan = rawAzanTimes[prayer];

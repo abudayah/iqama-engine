@@ -240,6 +240,10 @@ export class AdhanAdapter {
         ishaAngle: rp.ishaAngle,
         ishaInterval: rp.ishaInterval,
         maghribAngle: rp.maghribAngle,
+        // Include prayer name in the key when offset is non-zero so that two
+        // prayers with the same offset value never share a CalculationParameters
+        // group — the offset is applied to a specific prayer's adjustment slot.
+        prayer: rp.offsetMinutes !== 0 ? rp.prayer : undefined,
         offsetMinutes: rp.offsetMinutes,
         madhab: rp.madhab,
         highLatitudeRule: rp.highLatitudeRule,

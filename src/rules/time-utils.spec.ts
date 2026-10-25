@@ -2,6 +2,7 @@ import {
   formatHHmm,
   ceilingToNearest5,
   ceilingToNearest30,
+  setTimeInTz,
 } from './time-utils';
 import dayjs from '../dayjs';
 
@@ -139,13 +140,23 @@ describe('Time Utils', () => {
     });
 
     it('should handle times with seconds', () => {
-      const time = dayjs.tz('2025-06-15 10:00', 'America/Vancouver').second(30);
+      const time = setTimeInTz(
+        dayjs.tz('2025-06-15 10:00', 'America/Vancouver'),
+        10,
+        0,
+        30,
+      );
       const result = ceilingToNearest30(time);
       expect(formatHHmm(result)).toBe('10:30');
     });
 
     it('should bump sub-minute seconds to next minute before rounding', () => {
-      const time = dayjs.tz('2025-06-15 10:29', 'America/Vancouver').second(30);
+      const time = setTimeInTz(
+        dayjs.tz('2025-06-15 10:29', 'America/Vancouver'),
+        10,
+        29,
+        30,
+      );
       const result = ceilingToNearest30(time);
       // 10:29:30 -> bumps to minute 30 -> rounds to 10:30
       expect(formatHHmm(result)).toBe('10:30');

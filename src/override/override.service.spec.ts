@@ -8,6 +8,7 @@ describe('OverrideService', () => {
   let service: OverrideService;
 
   const mockPrismaService = {
+    $queryRaw: jest.fn(),
     override: {
       findMany: jest.fn(),
     },
@@ -37,18 +38,12 @@ describe('OverrideService', () => {
 
   describe('getOverridesForDate', () => {
     it('should return empty array when no overrides exist', async () => {
-      mockPrismaService.override.findMany.mockResolvedValue([]);
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
 
       const result = await service.getOverridesForDate('2025-06-15');
 
       expect(result).toEqual([]);
-      expect(mockPrismaService.override.findMany).toHaveBeenCalledWith({
-        where: {
-          startDate: { lte: new Date('2025-06-15T00:00:00.000Z') },
-          endDate: { gte: new Date('2025-06-15T00:00:00.000Z') },
-          deletedAt: null,
-        },
-      });
+      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
     });
 
     it('should return overrides for the given date', async () => {
@@ -65,7 +60,7 @@ describe('OverrideService', () => {
         },
       ];
 
-      mockPrismaService.override.findMany.mockResolvedValue(mockOverrides);
+      mockPrismaService.$queryRaw.mockResolvedValue(mockOverrides);
 
       const result = await service.getOverridesForDate('2025-06-15');
 

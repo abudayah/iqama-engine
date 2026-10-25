@@ -31,16 +31,16 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!validPassword) {
       throw new UnauthorizedException(
-        'Admin password is not configured on the server',
+        'Admin API key is not configured on the server',
       );
     }
 
     if (!password) {
-      throw new UnauthorizedException('Password is required');
+      throw new UnauthorizedException('API key is required');
     }
 
     if (!safeCompare(String(password), validPassword)) {
-      throw new UnauthorizedException('Invalid password');
+      throw new UnauthorizedException('Invalid API key');
     }
 
     return true;
