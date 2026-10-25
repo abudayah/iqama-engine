@@ -164,12 +164,11 @@ export class AdhanConfigService {
 
   async getConfig() {
     const today = this.todayInTimezone();
-    const [versions, periods] = await Promise.all([
+    const [versions, periods, currentRevision] = await Promise.all([
       this.allVersions(),
       this.allActivePeriods(),
+      this.latestVersionId(),
     ]);
-
-    const currentRevision = versions.at(-1)?.id ?? 0;
     const lat = this.configService.get<number>('app.masjidLatitude') ?? 0;
     const lon = this.configService.get<number>('app.masjidLongitude') ?? 0;
 
@@ -185,12 +184,27 @@ export class AdhanConfigService {
     const recommendedHighLatitudeRule =
       ADHAN_CATALOG.recommendedHighLatitudeRule(lat, lon);
 
+    // Warn if no period covers a date next summer (seed only covers 2 years).
+    const nextSummerDate = `${new Date().getFullYear() + 1}-06-15`;
+    const hasNextYearCoverage = periods.some(
+      (p) =>
+        p.deletedAt === null &&
+        p.startDate <= nextSummerDate &&
+        p.endDate >= nextSummerDate,
+    );
+    const periodsWarning = !hasNextYearCoverage
+      ? `No period covers ${nextSummerDate}. Run the seed or add a period for next year's summer Isha adjustment.`
+      : null;
+
     return {
       currentRevision,
       versions,
       periods,
       effective,
       recommendedHighLatitudeRule,
+      today,
+      timezone: this.timezone,
+      periodsWarning,
     };
   }
 

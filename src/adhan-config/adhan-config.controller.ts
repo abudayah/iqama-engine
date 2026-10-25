@@ -11,7 +11,6 @@ import {
   HttpStatus,
   UseGuards,
   Query,
-  Headers,
 } from '@nestjs/common';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 import { AdhanConfigService } from './adhan-config.service';
@@ -25,12 +24,10 @@ import { PreviewDto } from './dto/preview.dto';
 export class AdhanConfigController {
   constructor(private readonly service: AdhanConfigService) {}
 
-  private actorFromHeaders(
-    headers: Record<string, string | undefined>,
-  ): string {
-    // Use the API key as a stable actor identifier (already validated by guard)
-    const key = headers['x-api-key'] ?? 'unknown';
-    return key.substring(0, 8) + '…';
+  private actorFromHeaders(): string {
+    // Use a fixed actor until real user authentication exists.
+    // The API key itself must not appear in audit logs.
+    return 'admin';
   }
 
   /** GET /api/v1/admin/adhan-config */
@@ -54,21 +51,15 @@ export class AdhanConfigController {
 
   /** PUT /api/v1/admin/adhan-config/base */
   @Put('base')
-  createVersion(
-    @Body() dto: CreateVersionDto,
-    @Headers() headers: Record<string, string | undefined>,
-  ) {
-    return this.service.createVersion(dto, this.actorFromHeaders(headers));
+  createVersion(@Body() dto: CreateVersionDto) {
+    return this.service.createVersion(dto, this.actorFromHeaders());
   }
 
   /** POST /api/v1/admin/adhan-config/periods */
   @Post('periods')
   @HttpCode(HttpStatus.CREATED)
-  createPeriod(
-    @Body() dto: CreatePeriodDto,
-    @Headers() headers: Record<string, string | undefined>,
-  ) {
-    return this.service.createPeriod(dto, this.actorFromHeaders(headers));
+  createPeriod(@Body() dto: CreatePeriodDto) {
+    return this.service.createPeriod(dto, this.actorFromHeaders());
   }
 
   /** PUT /api/v1/admin/adhan-config/periods/:id */
@@ -76,9 +67,8 @@ export class AdhanConfigController {
   updatePeriod(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePeriodDto,
-    @Headers() headers: Record<string, string | undefined>,
   ) {
-    return this.service.updatePeriod(id, dto, this.actorFromHeaders(headers));
+    return this.service.updatePeriod(id, dto, this.actorFromHeaders());
   }
 
   /**
@@ -90,13 +80,8 @@ export class AdhanConfigController {
   deletePeriod(
     @Param('id', ParseIntPipe) id: number,
     @Query('previewId') previewId: string,
-    @Headers() headers: Record<string, string | undefined>,
   ) {
-    return this.service.deletePeriod(
-      id,
-      previewId,
-      this.actorFromHeaders(headers),
-    );
+    return this.service.deletePeriod(id, previewId, this.actorFromHeaders());
   }
 
   /** GET /api/v1/admin/adhan-config/history */
@@ -113,10 +98,7 @@ export class AdhanConfigController {
 
   /** POST /api/v1/admin/adhan-config/history/:id/revert */
   @Post('history/:id/revert')
-  revert(
-    @Param('id', ParseIntPipe) id: number,
-    @Headers() headers: Record<string, string | undefined>,
-  ) {
-    return this.service.revert(id, this.actorFromHeaders(headers));
+  revert(@Param('id', ParseIntPipe) id: number) {
+    return this.service.revert(id, this.actorFromHeaders());
   }
 }

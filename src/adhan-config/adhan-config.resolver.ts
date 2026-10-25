@@ -44,9 +44,12 @@ export function resolveAdhanSettings(
   periods: AdhanConfigPeriodRecord[],
 ): ResolvedAdhanSettings {
   // 1. Pick the active base version
-  const sortedVersions = [...versions].sort((a, b) =>
-    a.effectiveFrom < b.effectiveFrom ? -1 : 1,
-  );
+  const sortedVersions = [...versions].sort((a, b) => {
+    if (a.effectiveFrom !== b.effectiveFrom) {
+      return a.effectiveFrom < b.effectiveFrom ? -1 : 1;
+    }
+    return a.id - b.id; // tiebreaker: lower id = older
+  });
   const activeVersion = sortedVersions
     .filter((v) => v.effectiveFrom <= date)
     .at(-1);
