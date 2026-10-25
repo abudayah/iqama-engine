@@ -13,6 +13,9 @@ export declare class AdhanConfigController {
         periods: import("./adhan-config.types").AdhanConfigPeriodRecord[];
         effective: import("./adhan-config.types").ResolvedAdhanSettings | null;
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
+        today: string;
+        timezone: string;
+        periodsWarning: string | null;
     }>;
     getCatalog(): {
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
@@ -28,7 +31,7 @@ export declare class AdhanConfigController {
         currentRevision: number;
         warnings: import("./adhan-config.validator").ValidationIssue[];
     }>;
-    createVersion(dto: CreateVersionDto, headers: Record<string, string | undefined>): Promise<{
+    createVersion(dto: CreateVersionDto): Promise<{
         effectiveFrom: string;
         settings: string;
         reason: string | null;
@@ -36,7 +39,7 @@ export declare class AdhanConfigController {
         createdAt: Date;
         id: number;
     }>;
-    createPeriod(dto: CreatePeriodDto, headers: Record<string, string | undefined>): Promise<{
+    createPeriod(dto: CreatePeriodDto): Promise<{
         settings: string;
         createdBy: string;
         createdAt: Date;
@@ -47,7 +50,7 @@ export declare class AdhanConfigController {
         updatedAt: Date;
         deletedAt: Date | null;
     }>;
-    updatePeriod(id: number, dto: UpdatePeriodDto, headers: Record<string, string | undefined>): Promise<{
+    updatePeriod(id: number, dto: UpdatePeriodDto): Promise<{
         settings: string;
         createdBy: string;
         createdAt: Date;
@@ -58,7 +61,7 @@ export declare class AdhanConfigController {
         updatedAt: Date;
         deletedAt: Date | null;
     }>;
-    deletePeriod(id: number, previewId: string, headers: Record<string, string | undefined>): Promise<void>;
+    deletePeriod(id: number, previewId: string): Promise<void>;
     getHistory(page?: string, pageSize?: string): Promise<{
         items: {
             reason: string | null;
@@ -75,7 +78,7 @@ export declare class AdhanConfigController {
         page: number;
         pageSize: number;
     }>;
-    revert(id: number, headers: Record<string, string | undefined>): Promise<{
+    revert(id: number): Promise<{
         effectiveFrom: string;
         settings: string;
         reason: string | null;

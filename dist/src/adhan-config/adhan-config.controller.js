@@ -25,9 +25,8 @@ let AdhanConfigController = class AdhanConfigController {
     constructor(service) {
         this.service = service;
     }
-    actorFromHeaders(headers) {
-        const key = headers['x-api-key'] ?? 'unknown';
-        return key.substring(0, 8) + '…';
+    actorFromHeaders() {
+        return 'admin';
     }
     getConfig() {
         return this.service.getConfig();
@@ -38,23 +37,23 @@ let AdhanConfigController = class AdhanConfigController {
     preview(dto) {
         return this.service.preview(dto);
     }
-    createVersion(dto, headers) {
-        return this.service.createVersion(dto, this.actorFromHeaders(headers));
+    createVersion(dto) {
+        return this.service.createVersion(dto, this.actorFromHeaders());
     }
-    createPeriod(dto, headers) {
-        return this.service.createPeriod(dto, this.actorFromHeaders(headers));
+    createPeriod(dto) {
+        return this.service.createPeriod(dto, this.actorFromHeaders());
     }
-    updatePeriod(id, dto, headers) {
-        return this.service.updatePeriod(id, dto, this.actorFromHeaders(headers));
+    updatePeriod(id, dto) {
+        return this.service.updatePeriod(id, dto, this.actorFromHeaders());
     }
-    deletePeriod(id, previewId, headers) {
-        return this.service.deletePeriod(id, previewId, this.actorFromHeaders(headers));
+    deletePeriod(id, previewId) {
+        return this.service.deletePeriod(id, previewId, this.actorFromHeaders());
     }
     getHistory(page, pageSize) {
         return this.service.getHistory(page ? parseInt(page, 10) : 1, pageSize ? parseInt(pageSize, 10) : 20);
     }
-    revert(id, headers) {
-        return this.service.revert(id, this.actorFromHeaders(headers));
+    revert(id) {
+        return this.service.revert(id, this.actorFromHeaders());
     }
 };
 exports.AdhanConfigController = AdhanConfigController;
@@ -81,27 +80,24 @@ __decorate([
 __decorate([
     (0, common_1.Put)('base'),
     __param(0, (0, common_1.Body)()),
-    __param(1, (0, common_1.Headers)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_version_dto_1.CreateVersionDto, Object]),
+    __metadata("design:paramtypes", [create_version_dto_1.CreateVersionDto]),
     __metadata("design:returntype", void 0)
 ], AdhanConfigController.prototype, "createVersion", null);
 __decorate([
     (0, common_1.Post)('periods'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     __param(0, (0, common_1.Body)()),
-    __param(1, (0, common_1.Headers)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_period_dto_1.CreatePeriodDto, Object]),
+    __metadata("design:paramtypes", [create_period_dto_1.CreatePeriodDto]),
     __metadata("design:returntype", void 0)
 ], AdhanConfigController.prototype, "createPeriod", null);
 __decorate([
     (0, common_1.Put)('periods/:id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
-    __param(2, (0, common_1.Headers)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, update_period_dto_1.UpdatePeriodDto, Object]),
+    __metadata("design:paramtypes", [Number, update_period_dto_1.UpdatePeriodDto]),
     __metadata("design:returntype", void 0)
 ], AdhanConfigController.prototype, "updatePeriod", null);
 __decorate([
@@ -109,9 +105,8 @@ __decorate([
     (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Query)('previewId')),
-    __param(2, (0, common_1.Headers)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, String, Object]),
+    __metadata("design:paramtypes", [Number, String]),
     __metadata("design:returntype", void 0)
 ], AdhanConfigController.prototype, "deletePeriod", null);
 __decorate([
@@ -125,9 +120,8 @@ __decorate([
 __decorate([
     (0, common_1.Post)('history/:id/revert'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __param(1, (0, common_1.Headers)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], AdhanConfigController.prototype, "revert", null);
 exports.AdhanConfigController = AdhanConfigController = __decorate([

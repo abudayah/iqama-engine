@@ -26,6 +26,9 @@ export declare class AdhanConfigService {
         periods: AdhanConfigPeriodRecord[];
         effective: import("./adhan-config.types").ResolvedAdhanSettings | null;
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
+        today: string;
+        timezone: string;
+        periodsWarning: string | null;
     }>;
     getCatalog(): {
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;

@@ -12,7 +12,12 @@ const PRAYER_KEYS = [
     'isha',
 ];
 function resolveAdhanSettings(date, versions, periods) {
-    const sortedVersions = [...versions].sort((a, b) => a.effectiveFrom < b.effectiveFrom ? -1 : 1);
+    const sortedVersions = [...versions].sort((a, b) => {
+        if (a.effectiveFrom !== b.effectiveFrom) {
+            return a.effectiveFrom < b.effectiveFrom ? -1 : 1;
+        }
+        return a.id - b.id;
+    });
     const activeVersion = sortedVersions
         .filter((v) => v.effectiveFrom <= date)
         .at(-1);
