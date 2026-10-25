@@ -194,6 +194,8 @@ export class ScheduleBuilderService {
 
       let raw: ReturnType<typeof this.adhanAdapter.getPrayerTimes>;
       let effectiveMethod = 'ISNA';
+      // Per-prayer flag: true when a non-zero Azan offset is applied (base or period).
+      const azanCustomized: Partial<Record<string, boolean>> = {};
 
       if (hasConfig) {
         try {
@@ -204,6 +206,11 @@ export class ScheduleBuilderService {
           );
           raw = this.adhanAdapter.getPrayerTimesFromConfig(dateObj, resolved);
           effectiveMethod = resolved.general.method;
+          for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+            azanCustomized[key] =
+              (resolved.perPrayer[key as keyof typeof resolved.perPrayer]
+                ?.offsetMinutes ?? 0) !== 0;
+          }
         } catch {
           // Fallback to legacy adapter if resolver fails (shouldn't happen with seed)
           raw = this.adhanAdapter.getPrayerTimes(dateObj);
@@ -253,12 +260,32 @@ export class ScheduleBuilderService {
         hijri_date: hijriDate,
         day_of_week: dateDayjs.format('dddd'),
         is_dst: isDstActive(date, tz),
-        fajr: { azan: formatHHmm(raw.fajr), iqama: finalIqama.fajr },
+        fajr: {
+          azan: formatHHmm(raw.fajr),
+          iqama: finalIqama.fajr,
+          ...(azanCustomized['fajr'] ? { azan_customized: true } : {}),
+        },
         sunrise: formatHHmm(raw.sunrise),
-        dhuhr: { azan: formatHHmm(raw.dhuhr), iqama: finalIqama.dhuhr },
-        asr: { azan: formatHHmm(raw.asr), iqama: finalIqama.asr },
-        maghrib: { azan: formatHHmm(raw.maghrib), iqama: finalIqama.maghrib },
-        isha: { azan: formatHHmm(raw.isha), iqama: finalIqama.isha },
+        dhuhr: {
+          azan: formatHHmm(raw.dhuhr),
+          iqama: finalIqama.dhuhr,
+          ...(azanCustomized['dhuhr'] ? { azan_customized: true } : {}),
+        },
+        asr: {
+          azan: formatHHmm(raw.asr),
+          iqama: finalIqama.asr,
+          ...(azanCustomized['asr'] ? { azan_customized: true } : {}),
+        },
+        maghrib: {
+          azan: formatHHmm(raw.maghrib),
+          iqama: finalIqama.maghrib,
+          ...(azanCustomized['maghrib'] ? { azan_customized: true } : {}),
+        },
+        isha: {
+          azan: formatHHmm(raw.isha),
+          iqama: finalIqama.isha,
+          ...(azanCustomized['isha'] ? { azan_customized: true } : {}),
+        },
         ...(eidEntry
           ? { eid_prayer_1: eidEntry.prayer1, eid_prayer_2: eidEntry.prayer2 }
           : {}),
