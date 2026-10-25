@@ -50,7 +50,6 @@ export interface AdhanConfigVersionRecord {
     id: number;
     effectiveFrom: string;
     settings: string;
-    reason: string | null;
     createdBy: string;
     createdAt: Date;
 }
@@ -64,15 +63,4 @@ export interface AdhanConfigPeriodRecord {
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
-}
-export interface AdhanConfigAuditRecord {
-    id: number;
-    entity: 'VERSION' | 'PERIOD';
-    entityId: number;
-    action: 'CREATE' | 'UPDATE' | 'DELETE' | 'REVERT';
-    before: string | null;
-    after: string | null;
-    actor: string;
-    reason: string | null;
-    createdAt: Date;
 }

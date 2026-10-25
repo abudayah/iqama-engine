@@ -4,5 +4,4 @@ export declare class UpdatePeriodDto {
     endDate?: string;
     settings?: string;
     previewId: string;
-    reason?: string;
 }

@@ -17,7 +17,6 @@ class UpdatePeriodDto {
     endDate;
     settings;
     previewId;
-    reason;
 }
 exports.UpdatePeriodDto = UpdatePeriodDto;
 __decorate([
@@ -44,9 +43,4 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdatePeriodDto.prototype, "previewId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdatePeriodDto.prototype, "reason", void 0);
 //# sourceMappingURL=update-period.dto.js.map

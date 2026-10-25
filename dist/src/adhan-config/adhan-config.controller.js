@@ -44,16 +44,10 @@ let AdhanConfigController = class AdhanConfigController {
         return this.service.createPeriod(dto, this.actorFromHeaders());
     }
     updatePeriod(id, dto) {
-        return this.service.updatePeriod(id, dto, this.actorFromHeaders());
+        return this.service.updatePeriod(id, dto);
     }
     deletePeriod(id, previewId) {
-        return this.service.deletePeriod(id, previewId, this.actorFromHeaders());
-    }
-    getHistory(page, pageSize) {
-        return this.service.getHistory(page ? parseInt(page, 10) : 1, pageSize ? parseInt(pageSize, 10) : 20);
-    }
-    revert(id) {
-        return this.service.revert(id, this.actorFromHeaders());
+        return this.service.deletePeriod(id, previewId);
     }
 };
 exports.AdhanConfigController = AdhanConfigController;
@@ -109,21 +103,6 @@ __decorate([
     __metadata("design:paramtypes", [Number, String]),
     __metadata("design:returntype", void 0)
 ], AdhanConfigController.prototype, "deletePeriod", null);
-__decorate([
-    (0, common_1.Get)('history'),
-    __param(0, (0, common_1.Query)('page')),
-    __param(1, (0, common_1.Query)('pageSize')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
-    __metadata("design:returntype", void 0)
-], AdhanConfigController.prototype, "getHistory", null);
-__decorate([
-    (0, common_1.Post)('history/:id/revert'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
-    __metadata("design:returntype", void 0)
-], AdhanConfigController.prototype, "revert", null);
 exports.AdhanConfigController = AdhanConfigController = __decorate([
     (0, common_1.Controller)('api/v1/admin/adhan-config'),
     (0, common_1.UseGuards)(api_key_guard_1.ApiKeyGuard),

@@ -123,11 +123,17 @@ let ScheduleBuilderService = class ScheduleBuilderService {
             const dateObj = dayjs_1.default.tz(`${date}T12:00:00`, tz).toDate();
             let raw;
             let effectiveMethod = 'ISNA';
+            const azanCustomized = {};
             if (hasConfig) {
                 try {
                     const resolved = (0, adhan_config_resolver_1.resolveAdhanSettings)(date, adhanConfig.versions, adhanConfig.periods);
                     raw = this.adhanAdapter.getPrayerTimesFromConfig(dateObj, resolved);
                     effectiveMethod = resolved.general.method;
+                    for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+                        azanCustomized[key] =
+                            (resolved.perPrayer[key]
+                                ?.offsetMinutes ?? 0) !== 0;
+                    }
                 }
                 catch {
                     raw = this.adhanAdapter.getPrayerTimes(dateObj);
@@ -161,12 +167,32 @@ let ScheduleBuilderService = class ScheduleBuilderService {
                 hijri_date: hijriDate,
                 day_of_week: dateDayjs.format('dddd'),
                 is_dst: (0, dhuhr_rule_1.isDstActive)(date, tz),
-                fajr: { azan: (0, time_utils_1.formatHHmm)(raw.fajr), iqama: finalIqama.fajr },
+                fajr: {
+                    azan: (0, time_utils_1.formatHHmm)(raw.fajr),
+                    iqama: finalIqama.fajr,
+                    ...(azanCustomized['fajr'] ? { azan_customized: true } : {}),
+                },
                 sunrise: (0, time_utils_1.formatHHmm)(raw.sunrise),
-                dhuhr: { azan: (0, time_utils_1.formatHHmm)(raw.dhuhr), iqama: finalIqama.dhuhr },
-                asr: { azan: (0, time_utils_1.formatHHmm)(raw.asr), iqama: finalIqama.asr },
-                maghrib: { azan: (0, time_utils_1.formatHHmm)(raw.maghrib), iqama: finalIqama.maghrib },
-                isha: { azan: (0, time_utils_1.formatHHmm)(raw.isha), iqama: finalIqama.isha },
+                dhuhr: {
+                    azan: (0, time_utils_1.formatHHmm)(raw.dhuhr),
+                    iqama: finalIqama.dhuhr,
+                    ...(azanCustomized['dhuhr'] ? { azan_customized: true } : {}),
+                },
+                asr: {
+                    azan: (0, time_utils_1.formatHHmm)(raw.asr),
+                    iqama: finalIqama.asr,
+                    ...(azanCustomized['asr'] ? { azan_customized: true } : {}),
+                },
+                maghrib: {
+                    azan: (0, time_utils_1.formatHHmm)(raw.maghrib),
+                    iqama: finalIqama.maghrib,
+                    ...(azanCustomized['maghrib'] ? { azan_customized: true } : {}),
+                },
+                isha: {
+                    azan: (0, time_utils_1.formatHHmm)(raw.isha),
+                    iqama: finalIqama.isha,
+                    ...(azanCustomized['isha'] ? { azan_customized: true } : {}),
+                },
                 ...(eidEntry
                     ? { eid_prayer_1: eidEntry.prayer1, eid_prayer_2: eidEntry.prayer2 }
                     : {}),

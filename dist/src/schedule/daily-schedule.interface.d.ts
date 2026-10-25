@@ -1,6 +1,7 @@
 export interface PrayerEntry {
     azan: string;
     iqama: string;
+    azan_customized?: boolean;
 }
 export interface DailySchedule {
     date: string;

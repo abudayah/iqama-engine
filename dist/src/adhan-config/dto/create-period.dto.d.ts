@@ -4,5 +4,4 @@ export declare class CreatePeriodDto {
     endDate: string;
     settings: string;
     previewId: string;
-    reason?: string;
 }

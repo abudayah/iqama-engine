@@ -14,7 +14,6 @@ const class_validator_1 = require("class-validator");
 class CreateVersionDto {
     settings;
     effectiveFrom;
-    reason;
     previewId;
     expectedRevision;
 }
@@ -27,11 +26,6 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], CreateVersionDto.prototype, "effectiveFrom", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateVersionDto.prototype, "reason", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

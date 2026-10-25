@@ -19,7 +19,6 @@ export declare class AdhanConfigService {
     private latestVersionId;
     private generatePreviewId;
     private consumePreviewId;
-    private audit;
     getConfig(): Promise<{
         currentRevision: number;
         versions: AdhanConfigVersionRecord[];
@@ -28,7 +27,8 @@ export declare class AdhanConfigService {
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
         today: string;
         timezone: string;
-        periodsWarning: string | null;
+        latitude: number;
+        longitude: number;
     }>;
     getCatalog(): {
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
@@ -47,7 +47,6 @@ export declare class AdhanConfigService {
     createVersion(dto: CreateVersionDto, actor: string): Promise<{
         effectiveFrom: string;
         settings: string;
-        reason: string | null;
         createdBy: string;
         createdAt: Date;
         id: number;
@@ -63,7 +62,7 @@ export declare class AdhanConfigService {
         updatedAt: Date;
         deletedAt: Date | null;
     }>;
-    updatePeriod(id: number, dto: UpdatePeriodDto, actor: string): Promise<{
+    updatePeriod(id: number, dto: UpdatePeriodDto): Promise<{
         settings: string;
         createdBy: string;
         createdAt: Date;
@@ -74,29 +73,5 @@ export declare class AdhanConfigService {
         updatedAt: Date;
         deletedAt: Date | null;
     }>;
-    deletePeriod(id: number, previewId: string, actor: string): Promise<void>;
-    getHistory(page?: number, pageSize?: number): Promise<{
-        items: {
-            reason: string | null;
-            createdAt: Date;
-            id: number;
-            entity: string;
-            entityId: number;
-            action: string;
-            before: string | null;
-            after: string | null;
-            actor: string;
-        }[];
-        total: number;
-        page: number;
-        pageSize: number;
-    }>;
-    revert(auditId: number, actor: string): Promise<{
-        effectiveFrom: string;
-        settings: string;
-        reason: string | null;
-        createdBy: string;
-        createdAt: Date;
-        id: number;
-    }>;
+    deletePeriod(id: number, previewId: string): Promise<void>;
 }

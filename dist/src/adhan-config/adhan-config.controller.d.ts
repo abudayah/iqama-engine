@@ -15,7 +15,8 @@ export declare class AdhanConfigController {
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
         today: string;
         timezone: string;
-        periodsWarning: string | null;
+        latitude: number;
+        longitude: number;
     }>;
     getCatalog(): {
         recommendedHighLatitudeRule: import("./adhan-catalog").HighLatitudeRuleName;
@@ -34,7 +35,6 @@ export declare class AdhanConfigController {
     createVersion(dto: CreateVersionDto): Promise<{
         effectiveFrom: string;
         settings: string;
-        reason: string | null;
         createdBy: string;
         createdAt: Date;
         id: number;
@@ -62,28 +62,4 @@ export declare class AdhanConfigController {
         deletedAt: Date | null;
     }>;
     deletePeriod(id: number, previewId: string): Promise<void>;
-    getHistory(page?: string, pageSize?: string): Promise<{
-        items: {
-            reason: string | null;
-            createdAt: Date;
-            id: number;
-            entity: string;
-            entityId: number;
-            action: string;
-            before: string | null;
-            after: string | null;
-            actor: string;
-        }[];
-        total: number;
-        page: number;
-        pageSize: number;
-    }>;
-    revert(id: number): Promise<{
-        effectiveFrom: string;
-        settings: string;
-        reason: string | null;
-        createdBy: string;
-        createdAt: Date;
-        id: number;
-    }>;
 }

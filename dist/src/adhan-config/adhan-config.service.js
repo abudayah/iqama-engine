@@ -83,19 +83,6 @@ let AdhanConfigService = class AdhanConfigService {
         }
         this.previewTokens.delete(previewId);
     }
-    async audit(entity, entityId, action, actor, reason, before, after) {
-        await this.prisma.adhanConfigAudit.create({
-            data: {
-                entity,
-                entityId,
-                action,
-                actor,
-                reason: reason ?? null,
-                before: before ?? null,
-                after: after ?? null,
-            },
-        });
-    }
     async getConfig() {
         const today = this.todayInTimezone();
         const [versions, periods, currentRevision] = await Promise.all([
@@ -114,13 +101,6 @@ let AdhanConfigService = class AdhanConfigService {
             }
         }
         const recommendedHighLatitudeRule = adhan_catalog_1.ADHAN_CATALOG.recommendedHighLatitudeRule(lat, lon);
-        const nextSummerDate = `${new Date().getFullYear() + 1}-06-15`;
-        const hasNextYearCoverage = periods.some((p) => p.deletedAt === null &&
-            p.startDate <= nextSummerDate &&
-            p.endDate >= nextSummerDate);
-        const periodsWarning = !hasNextYearCoverage
-            ? `No period covers ${nextSummerDate}. Run the seed or add a period for next year's summer Isha adjustment.`
-            : null;
         return {
             currentRevision,
             versions,
@@ -129,7 +109,8 @@ let AdhanConfigService = class AdhanConfigService {
             recommendedHighLatitudeRule,
             today,
             timezone: this.timezone,
-            periodsWarning,
+            latitude: lat,
+            longitude: lon,
         };
     }
     getCatalog() {
@@ -220,11 +201,9 @@ let AdhanConfigService = class AdhanConfigService {
             data: {
                 effectiveFrom: dto.effectiveFrom,
                 settings: dto.settings,
-                reason: dto.reason ?? null,
                 createdBy: actor,
             },
         });
-        await this.audit('VERSION', version.id, 'CREATE', actor, dto.reason, undefined, dto.settings);
         const endOfYear = `${new Date().getFullYear() + 1}-12-31`;
         await this.scheduleBuilder.invalidateCache(dto.effectiveFrom, endOfYear);
         return version;
@@ -262,11 +241,10 @@ let AdhanConfigService = class AdhanConfigService {
                 createdBy: actor,
             },
         });
-        await this.audit('PERIOD', period.id, 'CREATE', actor, dto.reason, undefined, dto.settings);
         await this.scheduleBuilder.invalidateCache(dto.startDate, dto.endDate);
         return period;
     }
-    async updatePeriod(id, dto, actor) {
+    async updatePeriod(id, dto) {
         const existing = await this.prisma.adhanConfigPeriod.findUnique({
             where: { id },
         });
@@ -310,14 +288,13 @@ let AdhanConfigService = class AdhanConfigService {
                 ...(dto.settings ? { settings: dto.settings } : {}),
             },
         });
-        await this.audit('PERIOD', id, 'UPDATE', actor, dto.reason, existing.settings, updated.settings);
         await this.scheduleBuilder.invalidateCache(existing.startDate, existing.endDate);
         if (newStart !== existing.startDate || newEnd !== existing.endDate) {
             await this.scheduleBuilder.invalidateCache(newStart, newEnd);
         }
         return updated;
     }
-    async deletePeriod(id, previewId, actor) {
+    async deletePeriod(id, previewId) {
         const existing = await this.prisma.adhanConfigPeriod.findUnique({
             where: { id },
         });
@@ -330,46 +307,7 @@ let AdhanConfigService = class AdhanConfigService {
             where: { id },
             data: { deletedAt: new Date() },
         });
-        await this.audit('PERIOD', id, 'DELETE', actor, undefined, existing.settings, undefined);
         await this.scheduleBuilder.invalidateCache(existing.startDate, existing.endDate);
-    }
-    async getHistory(page = 1, pageSize = 20) {
-        const skip = (page - 1) * pageSize;
-        const [items, total] = await Promise.all([
-            this.prisma.adhanConfigAudit.findMany({
-                orderBy: { createdAt: 'desc' },
-                skip,
-                take: pageSize,
-            }),
-            this.prisma.adhanConfigAudit.count(),
-        ]);
-        return { items, total, page, pageSize };
-    }
-    async revert(auditId, actor) {
-        const auditEntry = await this.prisma.adhanConfigAudit.findUnique({
-            where: { id: auditId },
-        });
-        if (!auditEntry)
-            throw new common_1.NotFoundException(`Audit entry ${auditId} not found`);
-        if (auditEntry.entity !== 'VERSION') {
-            throw new common_1.BadRequestException('Only VERSION entries can be reverted via this endpoint');
-        }
-        if (!auditEntry.after) {
-            throw new common_1.BadRequestException('Audit entry has no settings snapshot to revert to');
-        }
-        const today = this.todayInTimezone();
-        const version = await this.prisma.adhanConfigVersion.create({
-            data: {
-                effectiveFrom: today,
-                settings: auditEntry.after,
-                reason: `Reverted from audit #${auditId}`,
-                createdBy: actor,
-            },
-        });
-        await this.audit('VERSION', version.id, 'REVERT', actor, `Reverted from audit #${auditId}`, undefined, auditEntry.after);
-        const endOfYear = `${new Date().getFullYear() + 1}-12-31`;
-        await this.scheduleBuilder.invalidateCache(today, endOfYear);
-        return version;
     }
 };
 exports.AdhanConfigService = AdhanConfigService;
