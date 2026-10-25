@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsDateString,
-  IsInt,
-  Min,
-} from 'class-validator';
+import { IsString, IsDateString, IsInt, Min } from 'class-validator';
 
 export class CreateVersionDto {
   /** Full AdhanSettings JSON — validated by AdhanConfigValidator */
@@ -14,10 +8,6 @@ export class CreateVersionDto {
   /** YYYY-MM-DD in masjid timezone. Must not be earlier than today. */
   @IsDateString()
   effectiveFrom: string;
-
-  @IsOptional()
-  @IsString()
-  reason?: string;
 
   /**
    * Confirmation token from POST /preview.

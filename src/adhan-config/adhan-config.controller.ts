@@ -25,8 +25,6 @@ export class AdhanConfigController {
   constructor(private readonly service: AdhanConfigService) {}
 
   private actorFromHeaders(): string {
-    // Use a fixed actor until real user authentication exists.
-    // The API key itself must not appear in audit logs.
     return 'admin';
   }
 
@@ -68,7 +66,7 @@ export class AdhanConfigController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePeriodDto,
   ) {
-    return this.service.updatePeriod(id, dto, this.actorFromHeaders());
+    return this.service.updatePeriod(id, dto);
   }
 
   /**
@@ -81,24 +79,6 @@ export class AdhanConfigController {
     @Param('id', ParseIntPipe) id: number,
     @Query('previewId') previewId: string,
   ) {
-    return this.service.deletePeriod(id, previewId, this.actorFromHeaders());
-  }
-
-  /** GET /api/v1/admin/adhan-config/history */
-  @Get('history')
-  getHistory(
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
-    return this.service.getHistory(
-      page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 20,
-    );
-  }
-
-  /** POST /api/v1/admin/adhan-config/history/:id/revert */
-  @Post('history/:id/revert')
-  revert(@Param('id', ParseIntPipe) id: number) {
-    return this.service.revert(id, this.actorFromHeaders());
+    return this.service.deletePeriod(id, previewId);
   }
 }

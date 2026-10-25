@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsOptional } from 'class-validator';
+import { IsString, IsDateString } from 'class-validator';
 
 export class CreatePeriodDto {
   @IsString()
@@ -17,8 +17,4 @@ export class CreatePeriodDto {
   /** Confirmation token from POST /preview */
   @IsString()
   previewId: string;
-
-  @IsOptional()
-  @IsString()
-  reason?: string;
 }

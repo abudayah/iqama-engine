@@ -26,7 +26,6 @@ function makeVersion(
     id,
     effectiveFrom,
     settings: JSON.stringify(settings),
-    reason: null,
     createdBy: 'test',
     createdAt: new Date('2024-01-01'),
   };

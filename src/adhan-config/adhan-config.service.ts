@@ -1,7 +1,7 @@
 /**
  * adhan-config.service.ts
  *
- * CRUD, preview, confirmation-token management, and audit logging
+ * CRUD, preview, and confirmation-token management
  * for the Adhan configuration feature.
  */
 
@@ -136,30 +136,6 @@ export class AdhanConfigService {
     this.previewTokens.delete(previewId);
   }
 
-  // ── Audit ──────────────────────────────────────────────────────────────────
-
-  private async audit(
-    entity: 'VERSION' | 'PERIOD',
-    entityId: number,
-    action: 'CREATE' | 'UPDATE' | 'DELETE' | 'REVERT',
-    actor: string,
-    reason: string | undefined,
-    before?: string,
-    after?: string,
-  ): Promise<void> {
-    await this.prisma.adhanConfigAudit.create({
-      data: {
-        entity,
-        entityId,
-        action,
-        actor,
-        reason: reason ?? null,
-        before: before ?? null,
-        after: after ?? null,
-      },
-    });
-  }
-
   // ── GET /adhan-config ──────────────────────────────────────────────────────
 
   async getConfig() {
@@ -184,18 +160,6 @@ export class AdhanConfigService {
     const recommendedHighLatitudeRule =
       ADHAN_CATALOG.recommendedHighLatitudeRule(lat, lon);
 
-    // Warn if no period covers a date next summer (seed only covers 2 years).
-    const nextSummerDate = `${new Date().getFullYear() + 1}-06-15`;
-    const hasNextYearCoverage = periods.some(
-      (p) =>
-        p.deletedAt === null &&
-        p.startDate <= nextSummerDate &&
-        p.endDate >= nextSummerDate,
-    );
-    const periodsWarning = !hasNextYearCoverage
-      ? `No period covers ${nextSummerDate}. Run the seed or add a period for next year's summer Isha adjustment.`
-      : null;
-
     return {
       currentRevision,
       versions,
@@ -204,7 +168,8 @@ export class AdhanConfigService {
       recommendedHighLatitudeRule,
       today,
       timezone: this.timezone,
-      periodsWarning,
+      latitude: lat,
+      longitude: lon,
     };
   }
 
@@ -340,20 +305,9 @@ export class AdhanConfigService {
       data: {
         effectiveFrom: dto.effectiveFrom,
         settings: dto.settings,
-        reason: dto.reason ?? null,
         createdBy: actor,
       },
     });
-
-    await this.audit(
-      'VERSION',
-      version.id,
-      'CREATE',
-      actor,
-      dto.reason,
-      undefined,
-      dto.settings,
-    );
 
     // Invalidate cache for effectiveFrom onward (up to ~1 year ahead)
     const endOfYear = `${new Date().getFullYear() + 1}-12-31`;
@@ -407,15 +361,6 @@ export class AdhanConfigService {
       },
     });
 
-    await this.audit(
-      'PERIOD',
-      period.id,
-      'CREATE',
-      actor,
-      dto.reason,
-      undefined,
-      dto.settings,
-    );
     await this.scheduleBuilder.invalidateCache(dto.startDate, dto.endDate);
 
     return period;
@@ -423,7 +368,7 @@ export class AdhanConfigService {
 
   // ── PUT /adhan-config/periods/:id ─────────────────────────────────────────
 
-  async updatePeriod(id: number, dto: UpdatePeriodDto, actor: string) {
+  async updatePeriod(id: number, dto: UpdatePeriodDto) {
     const existing = await this.prisma.adhanConfigPeriod.findUnique({
       where: { id },
     });
@@ -478,16 +423,6 @@ export class AdhanConfigService {
       },
     });
 
-    await this.audit(
-      'PERIOD',
-      id,
-      'UPDATE',
-      actor,
-      dto.reason,
-      existing.settings,
-      updated.settings,
-    );
-
     // Invalidate both old and new date ranges
     await this.scheduleBuilder.invalidateCache(
       existing.startDate,
@@ -502,7 +437,7 @@ export class AdhanConfigService {
 
   // ── DELETE /adhan-config/periods/:id ──────────────────────────────────────
 
-  async deletePeriod(id: number, previewId: string, actor: string) {
+  async deletePeriod(id: number, previewId: string) {
     const existing = await this.prisma.adhanConfigPeriod.findUnique({
       where: { id },
     });
@@ -524,78 +459,9 @@ export class AdhanConfigService {
       data: { deletedAt: new Date() },
     });
 
-    await this.audit(
-      'PERIOD',
-      id,
-      'DELETE',
-      actor,
-      undefined,
-      existing.settings,
-      undefined,
-    );
     await this.scheduleBuilder.invalidateCache(
       existing.startDate,
       existing.endDate,
     );
-  }
-
-  // ── GET /adhan-config/history ──────────────────────────────────────────────
-
-  async getHistory(page = 1, pageSize = 20) {
-    const skip = (page - 1) * pageSize;
-    const [items, total] = await Promise.all([
-      this.prisma.adhanConfigAudit.findMany({
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: pageSize,
-      }),
-      this.prisma.adhanConfigAudit.count(),
-    ]);
-    return { items, total, page, pageSize };
-  }
-
-  // ── POST /adhan-config/history/:id/revert ─────────────────────────────────
-
-  async revert(auditId: number, actor: string) {
-    const auditEntry = await this.prisma.adhanConfigAudit.findUnique({
-      where: { id: auditId },
-    });
-    if (!auditEntry)
-      throw new NotFoundException(`Audit entry ${auditId} not found`);
-    if (auditEntry.entity !== 'VERSION') {
-      throw new BadRequestException(
-        'Only VERSION entries can be reverted via this endpoint',
-      );
-    }
-    if (!auditEntry.after) {
-      throw new BadRequestException(
-        'Audit entry has no settings snapshot to revert to',
-      );
-    }
-
-    const today = this.todayInTimezone();
-    const version = await this.prisma.adhanConfigVersion.create({
-      data: {
-        effectiveFrom: today,
-        settings: auditEntry.after,
-        reason: `Reverted from audit #${auditId}`,
-        createdBy: actor,
-      },
-    });
-
-    await this.audit(
-      'VERSION',
-      version.id,
-      'REVERT',
-      actor,
-      `Reverted from audit #${auditId}`,
-      undefined,
-      auditEntry.after,
-    );
-
-    const endOfYear = `${new Date().getFullYear() + 1}-12-31`;
-    await this.scheduleBuilder.invalidateCache(today, endOfYear);
-
-    return version;
   }
 }
