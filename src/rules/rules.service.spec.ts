@@ -104,8 +104,8 @@ describe('RulesService', () => {
       // Dhuhr should be 12:45 (standard time)
       expect(result.dhuhr).toBe('12:45');
 
-      // Asr should be 15:00 (early winter)
-      expect(result.asr).toBe('15:00');
+      // Asr should be 15:45 (Winter: first Friday of Nov → first Friday of Jan)
+      expect(result.asr).toBe('15:45');
     });
   });
 });

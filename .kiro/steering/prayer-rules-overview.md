@@ -103,16 +103,22 @@ Each prayer has its own rule file in `src/rules/`:
 - P2: Standard Time Friday: 12:40 PM (`12:45 - 5 min`)
 - P5: The UI renames the row label from "Dhuhr" to **"Friday"** on Fridays
 
-### Asr (FR4) - Seasonal Fixed Times
+### Asr (FR4) - Friday-anchored Seasonal Fixed Times
 
-**Calculation**:
+**Calculation** (the time only changes on the first Friday of the anchor month):
 
-- Spring/Summer (Mar 15 - Sep 15): 6:00 PM
-- Fall (Sep 16 - Nov 15): 5:00 PM
-- Early Winter (Nov 16 - Jan 15): 3:00 PM
-- Late Winter (Jan 16 - Mar 14): 4:00 PM
+- Spring/Summer (Mar 15 → first Friday of Sep): 6:00 PM (18:00)
+- Early Fall (first Friday of Sep → first Friday of Oct): 5:00 PM (17:00)
+- Fall (first Friday of Oct → first Friday of Nov): 4:30 PM (16:30)
+- Winter (first Friday of Nov → first Friday of Jan): 3:45 PM (15:45)
+- Late Winter (first Friday of Jan → Mar 14): 4:00 PM (16:00)
 
-**Benefits**: Only 4 changes per year, easy to remember and announce, predictable for congregation.
+The new time takes effect ON the anchor Friday (same day). The first Friday is
+computed at runtime (`firstFridayDate`) so it is correct every year without code
+edits; Mar 15 / Mar 14 are fixed calendar boundaries.
+
+**Benefits**: Changes always land on Jumu'ah, easy to announce ("starting this
+Friday…"), predictable for the congregation.
 
 ### Maghrib (FR1) - Simple Offset
 
@@ -235,16 +241,17 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 - UI renames the Dhuhr row to "Friday" on Fridays
 - Implemented in `dhuhr.rule.ts` and `PrayerTable.tsx`
 
-### Asr Rule Simplified
+### Asr Rule Simplified, then Friday-anchored
 
-**Previous**: Dynamic calculation with CeilingToNearest30(Azan + 15 min) - resulted in 13 changes per year
+**Original**: Dynamic calculation with CeilingToNearest30(Azan + 15 min) — 13 changes/year.
 
-**Current**: Seasonal fixed times - only 4 changes per year
+**Then**: Plain seasonal fixed times (4 fixed calendar boundaries: Mar 15, Sep 16, Nov 16, Jan 16).
 
-- Easier to remember and announce
-- More predictable for congregation
-- Still follows general sun position
-- Matches community expectations
+**Current**: Friday-anchored seasonal times. Each season begins on the **first
+Friday** of its anchor month (Sep/Oct/Nov/Jan), so the Asr Iqama only ever
+changes on a Jumu'ah. Mar 15 / Mar 14 remain fixed calendar boundaries. Times:
+6:00 PM (spring/summer), 5:00 PM (early fall), 4:30 PM (fall), 3:45 PM (winter),
+4:00 PM (late winter). Implemented in `asr.rule.ts` via `firstFridayDate()`.
 
 ### Fajr Rule Enhanced
 
