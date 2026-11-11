@@ -62,16 +62,27 @@ describe('validateRuleSet', () => {
     ).toEqual(['effectiveFrom']);
   });
 
-  it('warns (not errors) for a non-Friday effectiveFrom on locked prayers', () => {
+  it('errors on a non-Friday effectiveFrom for the four locked prayers', () => {
     const res = validateRuleSet(DEFAULT_RULE_SET, '2026-11-04'); // Wednesday
-    expect(res.errors).toEqual([]);
-    expect(paths(res.warnings).sort()).toEqual([
-      'fajr.weeklyLock',
-      'isha.weeklyLock',
+    expect(paths(res.errors).sort()).toEqual([
+      'asr.effectiveFrom',
+      'dhuhr.effectiveFrom',
+      'fajr.effectiveFrom',
+      'isha.effectiveFrom',
     ]);
-    expect(validateRuleSet(DEFAULT_RULE_SET, '2026-11-06').warnings).toEqual(
-      [],
-    );
+    expect(validateRuleSet(DEFAULT_RULE_SET, '2026-11-06').errors).toEqual([]);
+  });
+
+  it('lets Maghrib-only changes start on any day', () => {
+    const next = clone();
+    next.maghrib.base = { type: 'OFFSET', minutes: 10 };
+    expect(
+      validateRuleSet(next, '2026-11-04', DEFAULT_RULE_SET).errors,
+    ).toEqual([]);
+    next.fajr.base = { type: 'OFFSET', minutes: 70 };
+    expect(
+      paths(validateRuleSet(next, '2026-11-04', DEFAULT_RULE_SET).errors),
+    ).toEqual(['fajr.effectiveFrom']);
   });
 
   it('warns when limits are below the hard guardrails', () => {

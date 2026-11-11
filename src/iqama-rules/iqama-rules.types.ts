@@ -16,7 +16,11 @@ export const PRAYER_NAMES: readonly PrayerName[] = [
   'isha',
 ];
 
-/** Prayers that may use weeklyLock (Maghrib never). */
+/**
+ * Prayers with a weekly lock: Maghrib never. Their rules may only change on
+ * a Friday (validator error). For Dhuhr/Asr this affects effective dates only,
+ * not how the day's time is computed (see PrayerRule.weeklyLock).
+ */
 export const LOCKABLE_PRAYERS: readonly PrayerName[] = [
   'fajr',
   'dhuhr',
@@ -97,7 +101,11 @@ export interface PrayerRule {
   rounding?: Rounding;
   /** Minutes added on given weekdays, e.g. { FRI: -5 }. */
   weekdayAdjust?: Partial<Record<Weekday, number>>;
-  /** Hold the result for the Friday->Thursday window (latest per-day wins). */
+  /**
+   * Computation switch: hold the result for the Friday->Thursday window
+   * (latest per-day wins). Used by Fajr and Isha today; independent of the
+   * Friday-start rule above.
+   */
   weeklyLock?: boolean;
 }
 

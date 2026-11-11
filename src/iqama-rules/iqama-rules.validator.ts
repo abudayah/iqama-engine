@@ -28,7 +28,6 @@ const maxDay = (month: number) =>
 function validatePrayer(
   prayer: PrayerName,
   rule: PrayerRule | undefined,
-  effectiveFrom: string | undefined,
   errors: ValidationIssue[],
   warnings: ValidationIssue[],
 ): void {
@@ -164,14 +163,6 @@ function validatePrayer(
     if (!LOCKABLE_PRAYERS.includes(prayer)) {
       err('.weeklyLock', 'weekly lock is not available for this prayer');
     } else {
-      if (
-        effectiveFrom &&
-        new Date(`${effectiveFrom}T00:00:00Z`).getUTCDay() !== 5
-      )
-        warn(
-          '.weeklyLock',
-          `effective date ${effectiveFrom} is not a Friday; the locked time would change mid-week`,
-        );
       if (rule.weekdayAdjust && Object.keys(rule.weekdayAdjust).length > 0)
         warn(
           '.weekdayAdjust',
@@ -183,11 +174,14 @@ function validatePrayer(
 
 /**
  * Validate a rule set. Errors block saving; warnings are advice only.
- * `effectiveFrom` (YYYY-MM-DD) is optional and only used for the Friday warning.
+ * `effectiveFrom` (YYYY-MM-DD) is optional. When given, any of Fajr/Dhuhr/Asr/Isha
+ * that differs from `previous` (or all four when `previous` is omitted) must
+ * start on a Friday; that is an error, not a warning.
  */
 export function validateRuleSet(
   rules: RuleSet,
   effectiveFrom?: string,
+  previous?: RuleSet,
 ): ValidationResult {
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
@@ -207,7 +201,21 @@ export function validateRuleSet(
     }
   }
   for (const prayer of PRAYER_NAMES) {
-    validatePrayer(prayer, rules?.[prayer], effectiveFrom, errors, warnings);
+    validatePrayer(prayer, rules?.[prayer], errors, warnings);
+    // Fajr, Dhuhr, Asr and Isha may only change on a Friday (weekly lock).
+    // Maghrib may start on any day. Unchanged prayers are not checked.
+    if (
+      effectiveFrom &&
+      LOCKABLE_PRAYERS.includes(prayer) &&
+      new Date(`${effectiveFrom}T00:00:00Z`).getUTCDay() !== 5 &&
+      (!previous ||
+        JSON.stringify(previous[prayer]) !== JSON.stringify(rules?.[prayer]))
+    ) {
+      errors.push({
+        path: `${prayer}.effectiveFrom`,
+        message: `${prayer} changes must start on a Friday (got ${effectiveFrom})`,
+      });
+    }
   }
   return { errors, warnings };
 }
