@@ -4,7 +4,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { Dayjs } from 'dayjs';
 import dayjs from '../dayjs';
-import { AdhanAdapter } from '../adhan/adhan.adapter';
+import { AdhanAdapter, RawPrayerTimes } from '../adhan/adhan.adapter';
 import { RulesService, WeeklyContext } from '../rules/rules.service';
 import { WeeklyFajrEntry } from '../rules/fajr.rule';
 import { OverrideService } from '../override/override.service';
@@ -16,6 +16,7 @@ import {
 } from '../hijri-calendar/hijri-utils';
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
+import { applyIqamaGuardrail } from '../rules/iqama-guardrail';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
 import { resolveAdhanSettings } from '../adhan-config/adhan-config.resolver';
 import type {
@@ -50,6 +51,11 @@ function isAstronomicalEidDay(date: Dayjs): boolean {
     (month === 10 && day >= 1 && day <= 3) ||
     (month === 12 && day >= 10 && day <= 13)
   );
+}
+
+/** YYYY-MM-DD of an override boundary (Date from Prisma raw, or ISO string). */
+function toYmd(v: Date | string): string {
+  return (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
 }
 
 @Injectable()
@@ -109,7 +115,6 @@ export class ScheduleBuilderService {
 
     // Load adhan config once per month build
     const adhanConfig = await this.loadAdhanConfig();
-    const hasConfig = adhanConfig.versions.length > 0;
 
     // Determine the number of days in the month
     const daysInMonth = dayjs.tz(`${yearMonth}-01`, tz).daysInMonth();
@@ -154,6 +159,12 @@ export class ScheduleBuilderService {
       }
     }
 
+    // One overrides query per month (not per day), already ordered createdAt DESC.
+    const monthOverrides = await this.overrideService.getOverridesForRange(
+      monthStart,
+      monthEnd,
+    );
+
     const schedules: DailySchedule[] = [];
 
     // Derive the Hijri year from the first day of the month and fetch qiyam config once
@@ -178,7 +189,7 @@ export class ScheduleBuilderService {
       const cached = weeklyCtxCache.get(weekFridayKey);
       if (cached) return cached;
 
-      const ctx = this.buildWeeklyContext(date, tz);
+      const ctx = this.buildWeeklyContext(date, tz, adhanConfig);
       weeklyCtxCache.set(weekFridayKey, ctx);
       return ctx;
     };
@@ -186,41 +197,17 @@ export class ScheduleBuilderService {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = `${yearMonth}-${String(day).padStart(2, '0')}`;
 
-      // (a) Get raw prayer times for this day.
-      // Use local noon in the masjid timezone (not UTC noon) so the adhan
-      // library receives the correct calendar date regardless of the server's
-      // system timezone.
-      const dateObj = dayjs.tz(`${date}T12:00:00`, tz).toDate();
+      // (a) Get raw prayer times for this day (config-resolved when configured).
+      const { raw, effectiveMethod, azanCustomized } = this.resolveRawTimes(
+        date,
+        tz,
+        adhanConfig,
+      );
 
-      let raw: ReturnType<typeof this.adhanAdapter.getPrayerTimes>;
-      let effectiveMethod = 'ISNA';
-      // Per-prayer flag: true when a non-zero Azan offset is applied (base or period).
-      const azanCustomized: Partial<Record<string, boolean>> = {};
-
-      if (hasConfig) {
-        try {
-          const resolved = resolveAdhanSettings(
-            date,
-            adhanConfig.versions,
-            adhanConfig.periods,
-          );
-          raw = this.adhanAdapter.getPrayerTimesFromConfig(dateObj, resolved);
-          effectiveMethod = resolved.general.method;
-          for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
-            azanCustomized[key] =
-              (resolved.perPrayer[key as keyof typeof resolved.perPrayer]
-                ?.offsetMinutes ?? 0) !== 0;
-          }
-        } catch {
-          // Fallback to legacy adapter if resolver fails (shouldn't happen with seed)
-          raw = this.adhanAdapter.getPrayerTimes(dateObj);
-        }
-      } else {
-        raw = this.adhanAdapter.getPrayerTimes(dateObj);
-      }
-
-      // (b) Get overrides for this day
-      const overrides = await this.overrideService.getOverridesForDate(date);
+      // (b) Overrides covering this day (fetched once per month above)
+      const overrides = monthOverrides.filter(
+        (o) => toYmd(o.startDate) <= date && toYmd(o.endDate) >= date,
+      );
 
       // (c) Get the weekly context (Friday→Thursday window) for FR3-W / FR4-W.
       //     Reuse the cached result when multiple days share the same week.
@@ -239,8 +226,22 @@ export class ScheduleBuilderService {
       };
 
       // Apply overrides (FR6)
-      const { iqamaTimes: finalIqama, hasOverrides } =
+      const { iqamaTimes: overridden, hasOverrides } =
         this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
+
+      // Hard guardrail on every path (rules AND overrides): min gap after Azan,
+      // and Fajr ends >= 60 min before sunrise.
+      const finalIqama = { ...overridden };
+      const clamped: Partial<Record<string, boolean>> = {};
+      for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const) {
+        const g = applyIqamaGuardrail(
+          overridden[key],
+          rawAzanMap[key],
+          key === 'fajr' ? raw.sunrise : undefined,
+        );
+        finalIqama[key] = g.iqama;
+        clamped[key] = g.clamped;
+      }
 
       // (f) Build the DailySchedule object
       const dateDayjs = dayjs.tz(date, tz);
@@ -264,27 +265,32 @@ export class ScheduleBuilderService {
           azan: formatHHmm(raw.fajr),
           iqama: finalIqama.fajr,
           ...(azanCustomized['fajr'] ? { azan_customized: true } : {}),
+          ...(clamped['fajr'] ? { iqama_clamped: true } : {}),
         },
         sunrise: formatHHmm(raw.sunrise),
         dhuhr: {
           azan: formatHHmm(raw.dhuhr),
           iqama: finalIqama.dhuhr,
           ...(azanCustomized['dhuhr'] ? { azan_customized: true } : {}),
+          ...(clamped['dhuhr'] ? { iqama_clamped: true } : {}),
         },
         asr: {
           azan: formatHHmm(raw.asr),
           iqama: finalIqama.asr,
           ...(azanCustomized['asr'] ? { azan_customized: true } : {}),
+          ...(clamped['asr'] ? { iqama_clamped: true } : {}),
         },
         maghrib: {
           azan: formatHHmm(raw.maghrib),
           iqama: finalIqama.maghrib,
           ...(azanCustomized['maghrib'] ? { azan_customized: true } : {}),
+          ...(clamped['maghrib'] ? { iqama_clamped: true } : {}),
         },
         isha: {
           azan: formatHHmm(raw.isha),
           iqama: finalIqama.isha,
           ...(azanCustomized['isha'] ? { azan_customized: true } : {}),
+          ...(clamped['isha'] ? { iqama_clamped: true } : {}),
         },
         ...(eidEntry
           ? { eid_prayer_1: eidEntry.prayer1, eid_prayer_2: eidEntry.prayer2 }
@@ -305,6 +311,59 @@ export class ScheduleBuilderService {
   }
 
   /**
+   * Raw Azan times for one date: config-resolved when an Adhan config exists,
+   * legacy hard-coded adapter otherwise (or if the resolver throws).
+   * Used for both the daily and the weekly (Fri→Thu) calculations.
+   */
+  private resolveRawTimes(
+    date: string,
+    tz: string,
+    adhanConfig: {
+      versions: AdhanConfigVersionRecord[];
+      periods: AdhanConfigPeriodRecord[];
+    },
+  ): {
+    raw: RawPrayerTimes;
+    effectiveMethod: string;
+    azanCustomized: Partial<Record<string, boolean>>;
+  } {
+    // Local noon in the masjid timezone so the adhan library gets the right
+    // calendar date regardless of the server's system timezone.
+    const dateObj = dayjs.tz(`${date}T12:00:00`, tz).toDate();
+    const azanCustomized: Partial<Record<string, boolean>> = {};
+    if (adhanConfig.versions.length > 0) {
+      try {
+        const resolved = resolveAdhanSettings(
+          date,
+          adhanConfig.versions,
+          adhanConfig.periods,
+        );
+        const raw = this.adhanAdapter.getPrayerTimesFromConfig(
+          dateObj,
+          resolved,
+        );
+        for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+          azanCustomized[key] =
+            (resolved.perPrayer[key as keyof typeof resolved.perPrayer]
+              ?.offsetMinutes ?? 0) !== 0;
+        }
+        return {
+          raw,
+          effectiveMethod: resolved.general.method,
+          azanCustomized,
+        };
+      } catch {
+        // Fall through to the legacy adapter (shouldn't happen with seed)
+      }
+    }
+    return {
+      raw: this.adhanAdapter.getPrayerTimes(dateObj),
+      effectiveMethod: 'ISNA',
+      azanCustomized: {},
+    };
+  }
+
+  /**
    * Build the WeeklyContext for a given date.
    *
    * The week window runs from the most recent Friday (inclusive) through the
@@ -313,7 +372,14 @@ export class ScheduleBuilderService {
    *
    * dayjs day-of-week: 0 = Sunday … 5 = Friday … 6 = Saturday
    */
-  private buildWeeklyContext(date: string, tz: string): WeeklyContext {
+  private buildWeeklyContext(
+    date: string,
+    tz: string,
+    adhanConfig: {
+      versions: AdhanConfigVersionRecord[];
+      periods: AdhanConfigPeriodRecord[];
+    },
+  ): WeeklyContext {
     const d = dayjs.tz(date, tz);
 
     // Find the Friday that starts this week.
@@ -330,8 +396,11 @@ export class ScheduleBuilderService {
       const weekDate = weekStart.add(i, 'day');
       // Use the same pattern as the main calculation to ensure timezone consistency
       const weekDateStr = weekDate.format('YYYY-MM-DD');
-      const weekDateObj = dayjs.tz(`${weekDateStr}T12:00:00`, tz).toDate();
-      const weekRaw = this.adhanAdapter.getPrayerTimes(weekDateObj);
+      const { raw: weekRaw } = this.resolveRawTimes(
+        weekDateStr,
+        tz,
+        adhanConfig,
+      );
       fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
       ishaWeek.push(weekRaw.isha);
     }

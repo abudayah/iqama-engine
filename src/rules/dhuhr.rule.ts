@@ -3,18 +3,15 @@ import dayjs from '../dayjs';
 /**
  * Dhuhr Iqama Calculation (FR2)
  *
- * Returns "13:45" if DST is active on the given date, "12:45" otherwise.
- * DST detection: UTC offset of the date > UTC offset of Jan 1 of the same year.
+ * Fixed 13:45 year-round. B.C. stopped clock changes after 2026-03-08
+ * (UTC-7 all year), so there is no DST branch.
  *
  * Friday (Jumu'ah) rule: The iqama column shows the Khutbah start time,
- * which is 5 minutes before the actual prayer.
- * e.g. DST Friday → 13:40, Standard Time Friday → 12:40
+ * which is 5 minutes before the actual prayer → Friday 13:40.
  */
 export function computeDhuhrIqama(date: string, tz: string): string {
   const d = dayjs.tz(date, tz);
-  const jan1 = d.startOf('year');
-  const isDst = d.utcOffset() > jan1.utcOffset();
-  const baseTime = isDst ? '13:45' : '12:45';
+  const baseTime = '13:45';
 
   // On Fridays, subtract 5 minutes — iqama shows Khutbah start time
   if (d.day() === 5) {
@@ -29,7 +26,8 @@ export function computeDhuhrIqama(date: string, tz: string): string {
 }
 
 /**
- * Determine if DST is active for a given date and timezone.
+ * Display-only: whether the date's UTC offset exceeds Jan 1's (the `is_dst`
+ * schedule field). Not used by any iqama rule.
  */
 export function isDstActive(date: string, tz: string): boolean {
   const d = dayjs.tz(date, tz);

@@ -79,7 +79,7 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 ### The Five Prayers
 
 1. **Fajr (Dawn)** — Dynamic calculation with sunrise protection
-2. **Dhuhr (Noon)** — Fixed time based on DST status
+2. **Dhuhr (Noon)** — Fixed 13:45 year-round (Friday 13:40)
 3. **Asr (Afternoon)** — Clean 30-minute intervals
 4. **Maghrib (Sunset)** — Simple 5-minute offset
 5. **Isha (Night)** — Seasonal scaling based on sunset time

@@ -101,8 +101,8 @@ describe('RulesService', () => {
 
       const result = service.computeIqama(date, rawTimes);
 
-      // Dhuhr should be 12:45 (standard time)
-      expect(result.dhuhr).toBe('12:45');
+      // Dhuhr is 13:45 year-round (no clock changes)
+      expect(result.dhuhr).toBe('13:45');
 
       // Asr should be 15:45 (Winter: first Friday of Nov → first Friday of Jan)
       expect(result.asr).toBe('15:45');

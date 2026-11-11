@@ -24,7 +24,14 @@ export interface Override {
 export class OverrideService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getOverridesForDate(date: string): Promise<Override[]> {
+  /**
+   * Overrides overlapping [startDate, endDate] (YYYY-MM-DD, inclusive),
+   * newest first. One query per month instead of one per day.
+   */
+  async getOverridesForRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<Override[]> {
     // SQLite stores DateTime as "YYYY-MM-DDTHH:mm:ss.sss+00:00".
     // Prisma serializes JS Date objects as "YYYY-MM-DD HH:mm:ss.sss" for SQLite
     // queries, which breaks lte/gte comparisons because space (ASCII 32) < 'T' (84),
@@ -32,8 +39,8 @@ export class OverrideService {
     // Fix: use raw SQL comparing the YYYY-MM-DD prefix, which is format-agnostic.
     return this.prisma.$queryRaw<Override[]>`
       SELECT * FROM "Override"
-      WHERE substr("startDate", 1, 10) <= ${date}
-        AND substr("endDate",   1, 10) >= ${date}
+      WHERE substr("startDate", 1, 10) <= ${endDate}
+        AND substr("endDate",   1, 10) >= ${startDate}
         AND "deletedAt" IS NULL
       ORDER BY "createdAt" DESC
     `;
@@ -45,7 +52,8 @@ export class OverrideService {
    * Priority rules enforced here:
    * - P0 (Admin Override): Highest priority — admin override value is used instead of the
    *   FR1–FR5 calculation. The admin is a trusted operator who knows the Shariah requirements.
-   *   No safety ceiling is applied; the override is used as-is (after P3 rounding).
+   *   The override is used as-is (after P3 rounding); the min-gap / Fajr-sunrise
+   *   guardrail is applied afterwards by ScheduleBuilderService (iqama_clamped).
    * - P3: All override results are rounded to the nearest 5 minutes (CeilingToNearest5).
    *
    * Override types:

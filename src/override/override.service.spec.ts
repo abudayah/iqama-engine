@@ -36,11 +36,14 @@ describe('OverrideService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('getOverridesForDate', () => {
+  describe('getOverridesForRange', () => {
     it('should return empty array when no overrides exist', async () => {
       mockPrismaService.$queryRaw.mockResolvedValue([]);
 
-      const result = await service.getOverridesForDate('2025-06-15');
+      const result = await service.getOverridesForRange(
+        '2025-06-01',
+        '2025-06-30',
+      );
 
       expect(result).toEqual([]);
       expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
@@ -62,7 +65,10 @@ describe('OverrideService', () => {
 
       mockPrismaService.$queryRaw.mockResolvedValue(mockOverrides);
 
-      const result = await service.getOverridesForDate('2025-06-15');
+      const result = await service.getOverridesForRange(
+        '2025-06-01',
+        '2025-06-30',
+      );
 
       expect(result).toEqual(mockOverrides);
     });

@@ -3,6 +3,8 @@ export interface PrayerEntry {
   iqama: string; // HH:mm
   /** True when a non-zero per-prayer Azan offset is applied (base or active period). */
   azan_customized?: boolean;
+  /** True when the guardrail raised/lowered the Iqama (min gap after Azan, or Fajr 60 min before sunrise). */
+  iqama_clamped?: boolean;
 }
 
 export interface DailySchedule {
