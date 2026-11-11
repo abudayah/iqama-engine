@@ -5,6 +5,8 @@ fileMatchPattern: '{src/rules/**,src/adhan/**}'
 
 # Prayer Time Calculation Rules — Overview
 
+> **Rule system update:** Iqama rules are moving from code to admin-editable data. The pipeline is base -> modifiers -> override -> fixed guardrails, behind the `IQAMA_RULES` flag (`legacy` | `shadow` | `db`). See `iqama-rules-system.md` for the model, the four fixed rules, the admin API and the `iqama_clamped` field. This document describes the legacy `src/rules/*.rule.ts` behaviour, which the seed rules reproduce exactly.
+
 This document explains the Islamic prayer time (Iqama) calculation rules used in the iqama-engine. These rules transform raw astronomical prayer times (Azan) from the `adhan` library into congregation start times (Iqama) that are practical for the community.
 
 ## Azan Calculation Method
@@ -161,6 +163,7 @@ Rules balance religious requirements with practical concerns:
 
 1. **Individual Prayer Rules** (FR1-FR5) — Calculate Iqama for each prayer based on that day's Azan
 2. **Override Interception** (FR6) — Apply admin overrides if present
+3. **Hard guardrails** — Iqama >= Azan + 3 min on every path; Fajr >= 60 min before sunrise; a changed time sets `iqama_clamped: true`
 
 ## Admin Override System
 

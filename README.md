@@ -88,6 +88,40 @@ Each prayer uses its own astronomical time for maximum accuracy.
 
 For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md`.
 
+### Admin-configurable rules (iqama rule engine)
+
+Rules can be stored in the database (`IqamaRuleVersion`, append-only, versioned by effective date) and edited through the admin API. Per prayer the pipeline is fixed:
+
+```
+base (OFFSET | FIXED_TIME | SCALED_GAP | SEASONAL)
+  -> modifiers (limits, rounding, weekday adjust, weekly lock)
+  -> admin override
+  -> fixed guardrails
+```
+
+Fixed guardrails (constants in code, not configurable):
+
+1. Iqama is at least Azan + 3 minutes, overrides included.
+2. Fajr Iqama ends at least 60 minutes before sunrise.
+3. Fajr, Dhuhr, Asr and Isha rules may only change starting on a Friday.
+4. Maghrib may start any day.
+
+When a guardrail changes a time, that prayer in the schedule response has `"iqama_clamped": true`.
+
+Dhuhr is 13:45 year-round (Friday 13:40); British Columbia no longer changes clocks.
+
+**`IQAMA_RULES` environment variable**
+
+| Value              | Behaviour                                                            |
+| ------------------ | -------------------------------------------------------------------- |
+| `legacy` (default) | Hard-coded rules in `src/rules`                                      |
+| `shadow`           | Compute DB rules too, log `[iqama shadow]` differences, serve legacy |
+| `db`               | Serve the DB rules                                                   |
+
+**Admin API** (`X-API-Key`): `GET /api/v1/admin/iqama-rules`, `GET .../catalog`, `POST .../preview`, `PUT .../base`. See `.kiro/steering/iqama-rules-system.md`.
+
+**Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, and the cutover steps in `docs/iqama-rules-cutover-runbook.md`.
+
 ## API Endpoints
 
 ### Public Endpoints
