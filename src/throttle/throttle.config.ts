@@ -15,7 +15,7 @@ export const PUBLIC_LIMIT_PER_MIN = 300;
  * Routes protected by ApiKeyGuard (all admin routes), per client IP, ONE shared
  * counter for all of them. This is also what slows down guessing the admin key.
  */
-export const ADMIN_LIMIT_PER_MIN = 30;
+export const ADMIN_LIMIT_PER_MIN = 120;
 
 /**
  * A route is an "admin route" when ApiKeyGuard is applied to its handler or
