@@ -169,6 +169,7 @@ export function evaluateIqama(
     before,
     day.azanMin,
     prayer === 'fajr' ? day.sunriseMin : undefined,
+    rule.rounding?.mode === 'FLOOR',
   );
   return { iqama: toHHmm(after), clamped: after !== before };
 }

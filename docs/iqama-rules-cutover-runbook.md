@@ -46,7 +46,7 @@ Read-only.
 npx ts-node scripts/check-overrides-guardrail.ts
 ```
 
-It prints each override day that the guardrail would clamp (iqama earlier than Azan + 3 min, or Fajr later than sunrise − 60 min). For each line, ask the admin to fix or delete that override, or accept that the clamped time will be shown. Expected on a clean system: `No override would be clamped.`
+It prints each override day that the guardrail would clamp (iqama earlier than Azan + 3 min, Fajr later than sunrise − 60 min, or not on a 5-minute mark; overrides are already rounded up to 5 minutes when saved, so the last case is rare). For each line, ask the admin to fix or delete that override, or accept that the clamped time will be shown. Expected on a clean system: `No override would be clamped.`
 
 ## 4. Deploy in shadow mode
 

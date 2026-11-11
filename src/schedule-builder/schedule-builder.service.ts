@@ -301,6 +301,7 @@ export class ScheduleBuilderService {
           overridden[key],
           rawAzanMap[key],
           key === 'fajr' ? raw.sunrise : undefined,
+          mode === 'db' && ruleSet?.[key].rounding?.mode === 'FLOOR',
         );
         finalIqama[key] = g.iqama;
         clamped[key] = g.clamped;

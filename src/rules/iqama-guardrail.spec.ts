@@ -57,3 +57,48 @@ describe('applyIqamaGuardrail', () => {
     );
   });
 });
+
+describe('applyIqamaGuardrail: 5-minute marks', () => {
+  it('keeps a value already on a 5-minute mark', () => {
+    expect(applyIqamaGuardrail('09:05', t('08:00'))).toEqual({
+      iqama: '09:05',
+      clamped: false,
+    });
+  });
+
+  it('rounds an off-mark override up: 09:04 -> 09:05', () => {
+    expect(applyIqamaGuardrail('09:04', t('08:00'))).toEqual({
+      iqama: '09:05',
+      clamped: true,
+    });
+  });
+
+  it('rounds down when the rule rounding mode is FLOOR', () => {
+    expect(applyIqamaGuardrail('23:23', t('23:00'), undefined, true)).toEqual({
+      iqama: '23:20',
+      clamped: true,
+    });
+  });
+
+  it('FLOOR never goes below azan + 3 (rounds up instead)', () => {
+    // 23:19 floors to 23:15, below azan 23:16 + 3 -> first mark >= 23:19 = 23:20
+    expect(
+      applyIqamaGuardrail('23:19', t('23:16'), undefined, true).iqama,
+    ).toBe('23:20');
+  });
+
+  it('Fajr: round up would pass sunrise - 60, so take the last mark <= sunrise - 60', () => {
+    // sunrise 07:58 -> limit 06:58 -> last mark 06:55; 06:57 rounds up to 07:00 (too late)
+    expect(applyIqamaGuardrail('06:57', t('06:00'), t('07:58'))).toEqual({
+      iqama: '06:55',
+      clamped: true,
+    });
+  });
+
+  it('Fajr: the azan + 3 gap wins over the sunrise cap', () => {
+    // azan 06:54 -> first mark >= 06:57 is 07:00, above the 06:55 cap
+    expect(applyIqamaGuardrail('06:50', t('06:54'), t('07:58')).iqama).toBe(
+      '07:00',
+    );
+  });
+});

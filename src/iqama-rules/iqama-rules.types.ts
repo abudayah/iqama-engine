@@ -91,7 +91,7 @@ export interface Limits {
 export type RoundingMode = 'CEIL' | 'FLOOR' | 'NEAREST';
 export interface Rounding {
   mode: RoundingMode;
-  /** Minutes: 1, 5, 10, 15, 30 or 60. */
+  /** Minutes: 5, 10, 15, 30 or 60 (multiples of the 5-minute guardrail step). */
   step: number;
 }
 

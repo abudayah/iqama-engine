@@ -108,3 +108,28 @@ describe('IQAMA_RULES flag modes (ScheduleBuilderService)', () => {
     expect(d.dhuhr.iqama > d.dhuhr.azan).toBe(true);
   });
 });
+
+describe('5-minute mark guardrail in db mode', () => {
+  const rulesWith = (mode: 'FLOOR' | 'CEIL'): RuleSet => ({
+    ...DEFAULT_RULE_SET,
+    dhuhr: {
+      base: { type: 'FIXED_TIME', time: '13:45' },
+      rounding: { mode, step: 5 },
+      weekdayAdjust: { FRI: -2 },
+    },
+  });
+
+  it.each([
+    ['FLOOR', '13:40'],
+    ['CEIL', '13:45'],
+  ] as const)('Friday 13:43 with a %s rule becomes %s', async (mode, want) => {
+    const db = await makeStack({
+      mode: 'db',
+      rows: [versionRow(1, '1970-01-01', rulesWith(mode))],
+    });
+    const fri = (await db.builder.buildMonth('2026-06'))[11]; // 2026-06-12
+    expect(fri.day_of_week).toBe('Friday');
+    expect(fri.dhuhr.iqama).toBe(want);
+    expect(fri.dhuhr.iqama_clamped).toBe(true);
+  });
+});

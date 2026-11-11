@@ -1,5 +1,6 @@
 import {
   FAJR_SUNRISE_BUFFER_MIN,
+  IQAMA_STEP_MIN,
   MIN_IQAMA_GAP_MIN,
 } from '../rules/iqama-guardrail';
 import { LOCKABLE_PRAYERS, PRAYER_NAMES, WEEKDAYS } from './iqama-rules.types';
@@ -11,7 +12,7 @@ export const RANGES = {
   minAfterAzan: { min: 0, max: 120 },
   latestBeforeSunrise: { min: 0, max: 240 },
   weekdayAdjust: { min: -60, max: 60 },
-  roundingSteps: [1, 5, 10, 15, 30, 60],
+  roundingSteps: [5, 10, 15, 30, 60], // multiples of IQAMA_STEP_MIN
   scaledGapMinPoints: 2,
 } as const;
 
@@ -101,5 +102,6 @@ export const RULE_CATALOG = {
   guardrails: {
     minGapAfterAzanMinutes: MIN_IQAMA_GAP_MIN,
     fajrEndsBeforeSunriseMinutes: FAJR_SUNRISE_BUFFER_MIN,
+    iqamaStepMinutes: IQAMA_STEP_MIN,
   },
 } as const;

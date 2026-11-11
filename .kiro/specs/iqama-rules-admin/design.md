@@ -17,7 +17,7 @@ Azan + sunrise (config-resolved)
 
 ## Key Design Decisions
 
-- **Guardrails are not rules.** `src/rules/iqama-guardrail.ts` exports `MIN_IQAMA_GAP_MIN = 3`, `FAJR_SUNRISE_BUFFER_MIN = 60` and `guardrailMinutes`. The builder applies them after overrides for all five prayers; the evaluator uses the same function. Nothing is stored or editable.
+- **Guardrails are not rules.** `src/rules/iqama-guardrail.ts` exports `MIN_IQAMA_GAP_MIN = 3`, `FAJR_SUNRISE_BUFFER_MIN = 60`, `IQAMA_STEP_MIN = 5` and `guardrailMinutes`. The builder applies them after overrides for all five prayers; the evaluator uses the same function. Nothing is stored or editable.
 - **Min gap wins** over the Fajr sunrise cap: an Iqama before the Azan is never acceptable.
 - **Pure evaluator** (`iqama-rules.evaluator.ts`) works in minutes since midnight. Inputs are a `DayCtx` (`date`, `azanMin`, `sunriseMin?`) and, for weekly lock, the Friday→Thursday window. No dayjs, no I/O.
 - **Modifier order** inside a day: min-after-Azan raises the target, the sunrise limit caps it (limit wins), rounding applies, and if rounding broke a limit it steps back the other way (Isha's FLOOR falls back to CEIL when below the minimum). Then weekday adjust. Weekly lock last: latest per-day result of the window, capped by the smallest sunrise limit of the window and floored to the rounding step.

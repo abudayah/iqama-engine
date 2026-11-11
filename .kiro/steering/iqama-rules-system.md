@@ -18,7 +18,7 @@ base -> modifiers -> admin override -> hard guardrails
    - `FIXED_TIME` — a clock time `HH:mm`
    - `SCALED_GAP` — gap after Azan scales linearly with Azan time between points (flat outside them)
    - `SEASONAL` — yearly segments starting on a calendar date (`DATE`) or on the first Friday of a month (`FIRST_FRIDAY`); the last segment wraps over New Year
-2. **Modifiers** (fixed order): `limits` (min after Azan; Fajr only: latest = sunrise − N) → `rounding` (CEIL/FLOOR/NEAREST, step 1/5/10/15/30/60) → `weekdayAdjust` (e.g. `FRI: -5`) → `weeklyLock` (hold the Friday→Thursday result; latest per-day wins; Fajr and Isha use it today).
+2. **Modifiers** (fixed order): `limits` (min after Azan; Fajr only: latest = sunrise − N) → `rounding` (CEIL/FLOOR/NEAREST, step 5/10/15/30/60) → `weekdayAdjust` (e.g. `FRI: -5`) → `weeklyLock` (hold the Friday→Thursday result; latest per-day wins; Fajr and Isha use it today).
 3. **Override** — admin FIXED/OFFSET override (existing `OverrideService`, rounded up to 5 min). Overrides are short exceptions.
 4. **Guardrails** — constants in `src/rules/iqama-guardrail.ts`. No admin setting. They run on every path including overrides. A changed time sets `iqama_clamped: true` on that prayer.
 
@@ -28,6 +28,7 @@ base -> modifiers -> admin override -> hard guardrails
 2. **Fajr** Iqama ends at least **60 min before sunrise** (also for overrides). If it conflicts with rule 1, rule 1 wins.
 3. **Fajr, Dhuhr, Asr and Isha** may only change on a **Friday**. A non-Friday `effectiveFrom` is a validation error when one of those four rules changes.
 4. **Maghrib** may start on any day and has no weekly lock.
+5. Every final Iqama lands on a **5-minute mark** (`IQAMA_STEP_MIN = 5`). Already on a mark: kept. Otherwise rounded **up**, or **down** when that prayer's own rule rounding mode is FLOOR (e.g. Isha); a floor never goes below Azan + 3 (it rounds up instead). Fajr: if rounding up would pass sunrise − 60, the last mark ≤ sunrise − 60 is used, but never below Azan + 3 (the gap wins). `iqama_clamped: true` only if the guardrail moved the time. The catalog exposes it as `guardrails.iqamaStepMinutes`; rule rounding steps must be multiples of 5 (5/10/15/30/60).
 
 `weeklyLock` is a computation switch; the Friday-start rule (3) applies to the four prayers whether or not their `weeklyLock` is on.
 

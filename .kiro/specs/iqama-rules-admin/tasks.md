@@ -44,6 +44,11 @@ Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqa
   - [x] 4.2 This spec
   - [x] 4.3 `docs/iqama-rules-cutover-runbook.md`
 
+- [x] 4b. Fixed rule 5: every final Iqama on a 5-minute mark (commit `phase 4: 5-minute mark guardrail`)
+  - [x] 4b.1 `IQAMA_STEP_MIN = 5` in `iqama-guardrail.ts`; round up, or down for FLOOR rules, never below Azan + 3; Fajr sunrise − 60 handled
+  - [x] 4b.2 Catalog `guardrails.iqamaStepMinutes`; validator: rounding step must be a multiple of 5
+  - [x] 4b.3 Tests (all days 2026–2035 on a mark, override 09:04 → 09:05, FLOOR stays floor, Fajr conflict); golden master unchanged (zero diffs)
+
 - [ ] 5. Production cutover (see runbook)
   - [ ] 5.1 Check the production Node/ICU timezone data (America/Vancouver in January 2027 must be UTC-7)
   - [ ] 5.2 Migrate and seed

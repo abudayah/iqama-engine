@@ -29,6 +29,7 @@ describe('validateRuleSet', () => {
       ],
     };
     r.maghrib.rounding = { mode: 'CEIL', step: 7 };
+    r.isha.rounding = { mode: 'FLOOR', step: 1 }; // not a multiple of 5
     r.maghrib.weekdayAdjust = { FRI: 99 };
     const p = paths(validateRuleSet(r).errors);
     expect(p).toEqual(
@@ -39,6 +40,7 @@ describe('validateRuleSet', () => {
         'asr.base.segments[0].start.day',
         'asr.base.segments[1].start.month',
         'maghrib.rounding.step',
+        'isha.rounding.step',
         'maghrib.weekdayAdjust.FRI',
       ]),
     );

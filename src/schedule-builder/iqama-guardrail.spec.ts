@@ -97,6 +97,9 @@ describe('iqama guardrail (final schedule)', () => {
           );
           for (const d of days) {
             for (const p of PRAYERS) {
+              if (mins(d[p].iqama) % 5 !== 0) {
+                bad.push(`${d.date} ${p} not on a 5-min mark: ${d[p].iqama}`);
+              }
               if (mins(d[p].iqama) < mins(d[p].azan) + 3) {
                 bad.push(`${d.date} ${p} ${d[p].azan}->${d[p].iqama}`);
               }

@@ -42,6 +42,10 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 3. WHEN rules 1 and 2 conflict, rule 1 SHALL win.
 4. WHEN a guardrail changes a time, THE prayer entry SHALL include `iqama_clamped: true`; otherwise the field SHALL be absent.
 5. THE guardrails SHALL be constants in code with no admin setting.
+6. THE schedule builder SHALL ensure every final Iqama is a multiple of 5 minutes on every path, including overrides. A value already on a mark SHALL be kept; otherwise it SHALL be rounded up, or down when the prayer's own rule rounding mode is FLOOR, never below Azan + 3 (it then rounds up).
+7. WHEN rounding up would pass Fajr's sunrise − 60 minutes, THE builder SHALL use the last 5-minute mark at or before sunrise − 60, but never below Azan + 3.
+8. `iqama_clamped: true` SHALL be set only when a guardrail moved the time.
+9. THE rounding step of a rule SHALL be a multiple of 5; the catalog SHALL expose `guardrails.iqamaStepMinutes`.
 
 ### Requirement 3: Rule model and evaluation
 

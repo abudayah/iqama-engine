@@ -46,6 +46,7 @@ describe('IqamaRulesService', () => {
     const { service } = await makeStack({});
     const c = service.getCatalog();
     expect(c.guardrails.minGapAfterAzanMinutes).toBe(3);
+    expect(c.guardrails.iqamaStepMinutes).toBe(5);
     expect(c.modifiers.limits.latestBeforeSunrise.prayers).toEqual(['fajr']);
     expect(c.baseTypes.map((b) => b.type)).toEqual([
       'OFFSET',

@@ -105,6 +105,7 @@ Fixed guardrails (constants in code, not configurable):
 2. Fajr Iqama ends at least 60 minutes before sunrise.
 3. Fajr, Dhuhr, Asr and Isha rules may only change starting on a Friday.
 4. Maghrib may start any day.
+5. Every final Iqama lands on a 5-minute mark (rounded up, or down for a FLOOR rule, never below Azan + 3).
 
 When a guardrail changes a time, that prayer in the schedule response has `"iqama_clamped": true`.
 

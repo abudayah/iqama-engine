@@ -99,3 +99,46 @@ describe('iqama-rules evaluator', () => {
     expect(r).toEqual({ iqama: '16:40', clamped: true });
   });
 });
+
+describe('evaluateIqama: 5-minute mark guardrail', () => {
+  // Friday adjust -2 pushes the rounded value off the 5-minute grid.
+  const rule = (mode: 'FLOOR' | 'CEIL'): PrayerRule => ({
+    base: { type: 'FIXED_TIME', time: '13:45' },
+    rounding: { mode, step: 5 },
+    weekdayAdjust: { FRI: -2 },
+  });
+  const fri = day('2027-01-01', '12:10');
+
+  it('FLOOR rule stays floor (13:43 -> 13:40)', () => {
+    expect(evaluateIqama('dhuhr', rule('FLOOR'), fri)).toEqual({
+      iqama: '13:40',
+      clamped: true,
+    });
+  });
+
+  it('CEIL rule rounds up (13:43 -> 13:45)', () => {
+    expect(evaluateIqama('dhuhr', rule('CEIL'), fri)).toEqual({
+      iqama: '13:45',
+      clamped: true,
+    });
+  });
+
+  it('an override off the grid goes up: 09:04 -> 09:05', () => {
+    const d = day('2027-01-04', '08:00');
+    expect(
+      evaluateIqama('dhuhr', DEFAULT_RULE_SET.dhuhr, d, undefined, '09:04'),
+    ).toEqual({ iqama: '09:05', clamped: true });
+  });
+
+  it('Fajr sunrise conflict: last mark <= sunrise - 60, gap still wins', () => {
+    const d = day('2027-06-10', '04:00', '05:58'); // limit 04:58 -> 04:55
+    expect(
+      evaluateIqama('fajr', DEFAULT_RULE_SET.fajr, d, undefined, '04:57').iqama,
+    ).toBe('04:55');
+    const tight = day('2027-06-10', '04:54', '05:58'); // gap wants 05:00
+    expect(
+      evaluateIqama('fajr', DEFAULT_RULE_SET.fajr, tight, undefined, '04:57')
+        .iqama,
+    ).toBe('05:00');
+  });
+});
