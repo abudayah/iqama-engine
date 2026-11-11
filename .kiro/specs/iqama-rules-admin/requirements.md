@@ -86,10 +86,21 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 
 1. THE flag `IQAMA_RULES` SHALL accept `legacy` (default), `shadow` and `db`; any other value SHALL behave as `legacy`.
 2. IN `shadow` mode THE builder SHALL serve the legacy result and log `[iqama shadow] <date> <prayer>: legacy=… db=…` for each difference.
-3. IN `db` mode THE builder SHALL serve DB rules, and fall back to legacy with a warning for dates no version covers.
+3. IN `db` mode THE builder SHALL serve DB rules for dates on or after the cutover and SHALL NOT fall back silently: a date with no covering version, or stored JSON that fails the runtime validator, SHALL fail with HTTP 500 and code `IQAMA_RULES_MISSING` or `IQAMA_RULES_INVALID`, logged. IN `shadow` mode such a problem SHALL be logged and legacy served.
 4. THE weekly context SHALL use config-resolved Azan times, and overrides SHALL be fetched once per month.
 5. A one-off script SHALL list existing overrides that the guardrails would clamp.
 6. A runbook SHALL describe the cutover and the rollback (`IQAMA_RULES=legacy`).
+7. Dates before `IQAMA_RULES_CUTOVER` (default 2026-11-13, a Friday) SHALL always use the legacy functions, including the historical Dhuhr DST logic; the Dhuhr fix applies from the cutover on. The seed SHALL create version 1 with `effectiveFrom` = the cutover.
+
+### Requirement 8: Overrides, reason and Fajr conflicts
+
+#### Acceptance Criteria
+
+1. WHEN several overrides cover a day for one prayer, THE newest SHALL win.
+2. Creating or updating an override that overlaps an active override for the same prayer SHALL fail with 409 naming the clashing override; different prayers MAY overlap. A read-only script SHALL list existing overlaps.
+3. A rule version MAY carry a `reason` (max 500 characters), returned with the versions. There is no `who` field.
+4. WHEN Azan + 3 minutes makes the Fajr 60-minutes-before-sunrise rule impossible, THE gap SHALL win and the schedule entry SHALL carry `iqama_conflict: true`.
+5. `POST /preview` SHALL list such days in `conflicts`; `PUT /base` SHALL require `acknowledgeConflicts: true` when there are any (422 otherwise).
 
 ### Requirement 7: Known effect on Asr
 

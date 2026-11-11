@@ -1,6 +1,6 @@
 /**
  * Golden master: the new evaluator + seed config must reproduce the legacy
- * src/rules/*.rule.ts functions (the oracle) for every day 2026-2035.
+ * src/rules/*.rule.ts functions (the oracle) for every day from the cutover (2026-11-13) to 2035.
  */
 import dayjs from '../dayjs';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +14,8 @@ import { applyIqamaGuardrail } from '../rules/iqama-guardrail';
 import { DEFAULT_RULE_SET } from './iqama-rules.seed';
 import { evaluateIqama, evaluateRule, toDayCtx } from './iqama-rules.evaluator';
 import { PRAYER_NAMES } from './iqama-rules.types';
+
+const CUTOVER = '2026-11-13';
 
 describe.each(['Etc/GMT+7', 'America/Vancouver'])(
   'golden master vs legacy rules (%s)',
@@ -46,8 +48,10 @@ describe.each(['Etc/GMT+7', 'America/Vancouver'])(
 
     it('matches every prayer, every day, 2026-2035 (before and after guardrail)', () => {
       const diffs: string[] = [];
-      const start = dayjs.tz('2026-01-01', tz);
-      for (let i = 0; i < 3652; i++) {
+      // The DB rules only serve dates from the cutover on; earlier dates keep legacy.
+      const start = dayjs.tz(CUTOVER, tz);
+      const days = dayjs.tz('2035-12-31', tz).diff(start, 'day') + 1;
+      for (let i = 0; i < days; i++) {
         const date = start.add(i, 'day').format('YYYY-MM-DD');
         const raw = rawOf(date);
         const wk = weekDates(date).map((d) => ({ d, raw: rawOf(d) }));
@@ -56,7 +60,7 @@ describe.each(['Etc/GMT+7', 'America/Vancouver'])(
           fajr: computeWeeklyFajrIqama(
             wk.map(({ raw: r }) => ({ fajrAzan: r.fajr, sunrise: r.sunrise })),
           ),
-          dhuhr: computeDhuhrIqama(date, tz),
+          dhuhr: computeDhuhrIqama(date, tz, CUTOVER),
           asr: computeAsrIqama(raw.asr),
           maghrib: computeMaghribIqama(raw.maghrib),
           isha: computeWeeklyIshaIqama(wk.map(({ raw: r }) => r.isha)),

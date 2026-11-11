@@ -11,9 +11,10 @@ import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.ser
 import { DailySchedule } from '../schedule/daily-schedule.interface';
 import { RULE_CATALOG } from './iqama-rules.catalog';
 import {
+  loadRuleSet,
+  parseCutover,
   parseIqamaRulesMode,
-  parseRuleVersions,
-  resolveRuleSet,
+  resolveRuleVersion,
 } from './iqama-rules.resolver';
 import { validateRuleSet } from './iqama-rules.validator';
 import {
@@ -30,6 +31,8 @@ const SAMPLE_DAYS = 14;
 /** Days scanned for the summary. */
 const SCAN_DAYS = 365;
 const FIRST_DATES = 10;
+/** Max Fajr clashes listed in a preview (the total is in summary.conflictDays). */
+const MAX_CONFLICTS_LISTED = 100;
 
 const addDays = (date: string, n: number): string => {
   const d = new Date(`${date}T00:00:00Z`);
@@ -47,7 +50,7 @@ export function nextFriday(today: string): string {
 export class IqamaRulesService {
   private readonly previewTokens = new Map<
     string,
-    { hash: string; expiresAt: number }
+    { hash: string; expiresAt: number; conflictCount: number }
   >();
   private readonly timezone: string;
 
@@ -86,11 +89,12 @@ export class IqamaRulesService {
       .digest('hex');
   }
 
-  private issuePreviewId(hash: string): string {
+  private issuePreviewId(hash: string, conflictCount: number): string {
     const id = `ipv_${randomBytes(8).toString('hex')}`;
     this.previewTokens.set(id, {
       hash,
       expiresAt: Date.now() + PREVIEW_TTL_MS,
+      conflictCount,
     });
     for (const [k, v] of this.previewTokens) {
       if (v.expiresAt < Date.now()) this.previewTokens.delete(k);
@@ -98,7 +102,11 @@ export class IqamaRulesService {
     return id;
   }
 
-  private consumePreviewId(id: string, hash: string): void {
+  private consumePreviewId(
+    id: string,
+    hash: string,
+    acknowledgeConflicts: boolean,
+  ): void {
     const token = this.previewTokens.get(id);
     if (!token || token.expiresAt < Date.now()) {
       this.previewTokens.delete(id);
@@ -110,6 +118,14 @@ export class IqamaRulesService {
       throw new UnprocessableEntityException(
         'Preview token does not match submitted settings. Please run the preview again.',
       );
+    }
+    // Checked before the token is used up, so the admin can retry with the flag.
+    if (token.conflictCount > 0 && !acknowledgeConflicts) {
+      throw new UnprocessableEntityException({
+        message: `This proposal has ${token.conflictCount} day(s) where Fajr cannot end 60 minutes before sunrise (Azan + 3 minutes wins). Review the conflicts in the preview and send acknowledgeConflicts: true to save.`,
+        code: 'IQAMA_CONFLICTS_NOT_ACKNOWLEDGED',
+        conflictCount: token.conflictCount,
+      });
     }
     this.previewTokens.delete(id);
   }
@@ -168,12 +184,23 @@ export class IqamaRulesService {
       this.allVersions(),
       this.latestVersionId(),
     ]);
-    const parsed = parseRuleVersions(versions);
+    let effective: RuleSet | null = null;
+    let effectiveError: string | null = null;
+    const row = resolveRuleVersion(today, versions);
+    if (row) {
+      try {
+        effective = loadRuleSet(row);
+      } catch (e) {
+        effectiveError = e instanceof Error ? e.message : String(e);
+      }
+    }
     return {
       mode: parseIqamaRulesMode(this.configService.get('app.iqamaRules')),
       currentRevision,
       versions,
-      effective: resolveRuleSet(today, parsed) ?? null,
+      effective,
+      effectiveError,
+      cutover: parseCutover(this.configService.get('app.iqamaRulesCutover')),
       today,
       timezone: this.timezone,
       defaultEffectiveFrom: nextFriday(today),
@@ -199,6 +226,7 @@ export class IqamaRulesService {
       id: currentRevision + 1,
       effectiveFrom,
       settings: dto.settings,
+      reason: null,
       createdBy: 'preview',
       createdAt: new Date(),
     };
@@ -230,6 +258,16 @@ export class IqamaRulesService {
     const byPrayer = Object.fromEntries(
       PRAYER_NAMES.map((p) => [p, { daysChanged: 0, daysClamped: 0 }]),
     );
+    const conflicts: {
+      date: string;
+      prayer: 'fajr';
+      azan: string;
+      sunrise: string;
+      iqama: string;
+      brokenLimit: string;
+      wonBy: string;
+    }[] = [];
+    let conflictDays = 0;
     const changedDates: string[] = [];
     const clampedDates: string[] = [];
     let daysClampedCurrent = 0;
@@ -254,6 +292,20 @@ export class IqamaRulesService {
           proposed: { iqama: p[name].iqama, clamped: cl },
         };
       }
+      if (p.fajr.iqama_conflict) {
+        conflictDays++;
+        if (conflicts.length < MAX_CONFLICTS_LISTED) {
+          conflicts.push({
+            date: p.date,
+            prayer: 'fajr',
+            azan: p.fajr.azan,
+            sunrise: p.sunrise,
+            iqama: p.fajr.iqama,
+            brokenLimit: 'fajr_ends_60_min_before_sunrise',
+            wonBy: 'azan_plus_3_min_gap',
+          });
+        }
+      }
       if (changed) changedDates.push(p.date);
       if (clamped) clampedDates.push(p.date);
       if (PRAYER_NAMES.some((n) => c[n].iqama_clamped)) daysClampedCurrent++;
@@ -263,10 +315,12 @@ export class IqamaRulesService {
     return {
       previewId: this.issuePreviewId(
         this.tokenHash(dto.settings, effectiveFrom, currentRevision),
+        conflictDays,
       ),
       currentRevision,
       effectiveFrom,
       warnings,
+      conflicts,
       days: days.slice(0, SAMPLE_DAYS),
       summary: {
         from: effectiveFrom,
@@ -275,6 +329,7 @@ export class IqamaRulesService {
         daysChanged: changedDates.length,
         daysClamped: clampedDates.length,
         daysClampedCurrent,
+        conflictDays,
         firstChangedDates: changedDates.slice(0, FIRST_DATES),
         firstClampedDates: clampedDates.slice(0, FIRST_DATES),
         byPrayer,
@@ -298,10 +353,16 @@ export class IqamaRulesService {
     this.consumePreviewId(
       dto.previewId,
       this.tokenHash(dto.settings, effectiveFrom, dto.expectedRevision),
+      dto.acknowledgeConflicts === true,
     );
 
     const version = await this.prisma.iqamaRuleVersion.create({
-      data: { effectiveFrom, settings: dto.settings, createdBy: actor },
+      data: {
+        effectiveFrom,
+        settings: dto.settings,
+        createdBy: actor,
+        reason: dto.reason ?? null,
+      },
     });
 
     const endOfNextYear = `${new Date().getFullYear() + 1}-12-31`;

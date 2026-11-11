@@ -5,6 +5,11 @@ export interface PrayerEntry {
   azan_customized?: boolean;
   /** True when the guardrail raised/lowered the Iqama (min gap after Azan, or Fajr 60 min before sunrise). */
   iqama_clamped?: boolean;
+  /**
+   * Fajr only: Azan + 3 min made it impossible to end 60 min before sunrise.
+   * The gap wins; this flags the day so it is never silent.
+   */
+  iqama_conflict?: boolean;
 }
 
 export interface DailySchedule {

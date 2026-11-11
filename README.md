@@ -119,9 +119,11 @@ Dhuhr is 13:45 year-round (Friday 13:40); British Columbia no longer changes clo
 | `shadow`           | Compute DB rules too, log `[iqama shadow]` differences, serve legacy |
 | `db`               | Serve the DB rules                                                   |
 
+`IQAMA_RULES_CUTOVER` (default `2026-11-13`, a Friday) is the first date served by the DB rules; earlier dates keep the legacy behaviour. In `db` mode a missing or invalid stored rule set is an explicit HTTP 500 (`IQAMA_RULES_MISSING` / `IQAMA_RULES_INVALID`), never a silent fallback. Overrides: the newest wins, and two overrides for the same prayer may not overlap (409). `iqama_conflict: true` marks Fajr days where Azan + 3 minutes beats the 60-minutes-before-sunrise rule.
+
 **Admin API** (`X-API-Key`): `GET /api/v1/admin/iqama-rules`, `GET .../catalog`, `POST .../preview`, `PUT .../base`. See `.kiro/steering/iqama-rules-system.md`.
 
-**Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, and the cutover steps in `docs/iqama-rules-cutover-runbook.md`.
+**Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, `npx ts-node scripts/report-override-overlaps.ts`, and the cutover steps in `docs/iqama-rules-cutover-runbook.md`.
 
 ## API Endpoints
 

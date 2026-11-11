@@ -20,12 +20,17 @@ import {
 } from '../hijri-calendar/hijri-utils';
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
-import { applyIqamaGuardrail } from '../rules/iqama-guardrail';
 import {
-  ParsedRuleVersion,
+  applyIqamaGuardrail,
+  FAJR_SUNRISE_BUFFER_MIN,
+  toMin,
+} from '../rules/iqama-guardrail';
+import {
+  IqamaRulesError,
+  loadRuleSet,
+  parseCutover,
   parseIqamaRulesMode,
-  parseRuleVersions,
-  resolveRuleSet,
+  resolveRuleVersion,
 } from '../iqama-rules/iqama-rules.resolver';
 import { evaluateRule, toDayCtx } from '../iqama-rules/iqama-rules.evaluator';
 import {
@@ -146,17 +151,48 @@ export class ScheduleBuilderService {
         : opts.rules === 'legacy'
           ? 'legacy'
           : 'db';
-    let ruleVersions: ParsedRuleVersion[] = [];
+    let ruleRows: IqamaRuleVersionRecord[] = [];
     if (mode !== 'legacy') {
-      const rows = Array.isArray(opts?.rules)
+      ruleRows = Array.isArray(opts?.rules)
         ? opts.rules
         : await this.prisma.iqamaRuleVersion.findMany({
             orderBy: { effectiveFrom: 'asc' },
           });
-      ruleVersions = parseRuleVersions(rows, (id) =>
-        this.logger.error(`IqamaRuleVersion ${id} has invalid JSON; ignored`),
-      );
     }
+    // Dates before the cutover always use the legacy rules (history stays as shown).
+    const cutover = parseCutover(
+      this.configService.get('app.iqamaRulesCutover'),
+    );
+    const ruleSetCache = new Map<number, RuleSet>();
+    /**
+     * DB rule set for a date, or undefined when legacy rules apply (legacy
+     * mode, or before the cutover). In db mode a missing or invalid version
+     * throws (HTTP 500 with a code); in shadow mode it is logged and legacy
+     * is served, so the shadow period can never break the schedule.
+     */
+    const ruleSetFor = (date: string): RuleSet | undefined => {
+      if (mode === 'legacy' || date < cutover) return undefined;
+      try {
+        const row = resolveRuleVersion(date, ruleRows);
+        if (!row) {
+          throw new IqamaRulesError(
+            'IQAMA_RULES_MISSING',
+            `No IqamaRuleVersion covers ${date} (cutover ${cutover}). Run the seed or add a version.`,
+          );
+        }
+        let rules = ruleSetCache.get(row.id);
+        if (!rules) {
+          rules = loadRuleSet(row);
+          ruleSetCache.set(row.id, rules);
+        }
+        return rules;
+      } catch (e) {
+        if (!(e instanceof IqamaRulesError)) throw e;
+        this.logger.error(`[iqama rules] ${e.code}: ${e.message}`);
+        if (mode === 'db') throw e;
+        return undefined;
+      }
+    };
 
     // Load adhan config once per month build
     const adhanConfig = await this.loadAdhanConfig();
@@ -259,8 +295,7 @@ export class ScheduleBuilderService {
       const weeklyCtx = getWeeklyCtx(date);
 
       // (d) Compute iqama times via FR1–FR4 (weekly rules for Fajr & Isha)
-      const ruleSet =
-        mode === 'legacy' ? undefined : resolveRuleSet(date, ruleVersions);
+      const ruleSet = ruleSetFor(date);
       let iqamaTimes: IqamaTimes;
       if (mode === 'db' && ruleSet) {
         iqamaTimes = this.computeDbIqama(ruleSet, date, raw, weeklyCtx);
@@ -271,10 +306,6 @@ export class ScheduleBuilderService {
             date,
             iqamaTimes,
             this.computeDbIqama(ruleSet, date, raw, weeklyCtx),
-          );
-        } else if (mode !== 'legacy' && !ruleSet) {
-          this.logger.warn(
-            `No IqamaRuleVersion covers ${date}; using legacy rules`,
           );
         }
       }
@@ -306,6 +337,10 @@ export class ScheduleBuilderService {
         finalIqama[key] = g.iqama;
         clamped[key] = g.clamped;
       }
+      // Fajr clash: Azan + 3 pushed Fajr past sunrise - 60 (the gap wins, but flag it).
+      const fajrConflict =
+        toMin(finalIqama.fajr) >
+        toMin(formatHHmm(raw.sunrise)) - FAJR_SUNRISE_BUFFER_MIN;
 
       // (f) Build the DailySchedule object
       const dateDayjs = dayjs.tz(date, tz);
@@ -330,6 +365,7 @@ export class ScheduleBuilderService {
           iqama: finalIqama.fajr,
           ...(azanCustomized['fajr'] ? { azan_customized: true } : {}),
           ...(clamped['fajr'] ? { iqama_clamped: true } : {}),
+          ...(fajrConflict ? { iqama_conflict: true } : {}),
         },
         sunrise: formatHHmm(raw.sunrise),
         dhuhr: {

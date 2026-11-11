@@ -29,6 +29,10 @@ Azan + sunrise (config-resolved)
 - **Flag in the builder, per call.** `legacy` never reads the rules table. `shadow` computes both from the same raw Azan data and logs differences before overrides/guardrails; `db` falls back to legacy (warning) when no version covers a date.
 - **Weekly context** keeps full raw times for the 7 days (`rawWeek`), built from the config-resolved adapter, so any prayer can use the weekly lock.
 - **Overrides** are fetched once per month (`getOverridesForRange`) and filtered per day in memory.
+- **Cutover.** `IQAMA_RULES_CUTOVER` (default 2026-11-13) is configuration, not data. `ScheduleBuilderService` uses the legacy functions for earlier dates in every mode; `computeDhuhrIqama(date, tz, cutover)` keeps the DST logic before it. The rule table is therefore only consulted from the cutover on. `iqama-rules.cutover.ts` has no imports so the seed script can load it with plain ts-node.
+- **No silent fallback.** `ruleSetFor(date)` in the builder resolves the covering version and runs `loadRuleSet` (JSON parse + `validateRuleSet`, not a cast), cached per version per build. Problems throw `IqamaRulesError` (HTTP 500, code `IQAMA_RULES_MISSING` | `IQAMA_RULES_INVALID`) in `db` mode; in `shadow` they are logged and legacy is served.
+- **Override precedence.** `applyOverrides` sorts by `createdAt`, `id` ascending, so the newest is applied last. `OverrideService.assertNoOverlap` (raw SQL on the YYYY-MM-DD prefix, same prayer, active only) guards create and update.
+- **Fajr conflict.** After the guardrail the builder compares the final Fajr with sunrise − 60; if it is later, the entry gets `iqama_conflict`. The preview stores the conflict count with its token so `PUT /base` can demand `acknowledgeConflicts` without rescanning.
 - **Seed** is a function over a minimal Prisma slice (`seedIqamaRules`) so it is unit-testable; `prisma/seed.ts` runs the Adhan and Iqama seeds one after the other because Prisma does not run a shell for `a && b`.
 
 ## Components

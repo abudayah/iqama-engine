@@ -133,6 +133,7 @@ export interface IqamaRuleVersionRecord {
   effectiveFrom: string; // YYYY-MM-DD
   settings: string; // JSON (RuleSet)
   createdBy: string;
+  reason?: string | null; // why the change was made (max 500 chars)
   createdAt: Date;
 }
 

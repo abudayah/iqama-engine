@@ -16,6 +16,7 @@ import { DEFAULT_RULE_SET } from './iqama-rules.seed';
 import { IqamaRuleVersionRecord, RuleSet } from './iqama-rules.types';
 
 export const TEST_TZ = 'Etc/GMT+7';
+export const TEST_CUTOVER = '2026-11-13';
 
 export const versionRow = (
   id: number,
@@ -25,6 +26,7 @@ export const versionRow = (
   id,
   effectiveFrom,
   settings: JSON.stringify(rules),
+  reason: null,
   createdBy: 'test',
   createdAt: new Date(),
 });
@@ -33,12 +35,13 @@ export async function makeStack(opts: {
   mode?: string;
   rows?: IqamaRuleVersionRecord[];
 }) {
-  const rows = opts.rows ?? [versionRow(1, '1970-01-01')];
+  const rows = opts.rows ?? [versionRow(1, TEST_CUTOVER)];
   const cfg: Record<string, unknown> = {
     'app.masjidLatitude': 49.2652047,
     'app.masjidLongitude': -122.7878735,
     'app.masjidTimezone': TEST_TZ,
     'app.iqamaRules': opts.mode,
+    'app.iqamaRulesCutover': TEST_CUTOVER,
   };
   const iqamaRuleVersion = {
     findMany: jest.fn(() =>
@@ -57,7 +60,12 @@ export async function makeStack(opts: {
       ({
         data,
       }: {
-        data: { effectiveFrom: string; settings: string; createdBy: string };
+        data: {
+          effectiveFrom: string;
+          settings: string;
+          createdBy: string;
+          reason?: string | null;
+        };
       }) => {
         const row = { id: rows.length + 1, createdAt: new Date(), ...data };
         rows.push(row);

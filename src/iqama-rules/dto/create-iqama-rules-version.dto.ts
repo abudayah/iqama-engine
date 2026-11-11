@@ -1,8 +1,10 @@
 import {
+  IsBoolean,
   IsDateString,
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -15,6 +17,20 @@ export class CreateIqamaRulesVersionDto {
   @IsOptional()
   @IsDateString()
   effectiveFrom?: string;
+
+  /** Optional note on why the rules changed (max 500 characters). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+
+  /**
+   * Required (true) when the preview listed Fajr conflicts: days where
+   * Azan + 3 minutes forces Fajr past sunrise - 60 minutes.
+   */
+  @IsOptional()
+  @IsBoolean()
+  acknowledgeConflicts?: boolean;
 
   /** Token from POST /preview for exactly these settings and date. */
   @IsString()

@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { nextFriday } from './iqama-rules.service';
 import { DEFAULT_RULE_SET } from './iqama-rules.seed';
-import { freezeDate, makeStack } from './testing';
+import { freezeDate, makeStack, versionRow } from './testing';
 import { RuleSet } from './iqama-rules.types';
+import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 
 // Wednesday. Next Friday = 2026-11-13.
 const NOW = '2026-11-11T20:00:00Z';
@@ -37,9 +38,24 @@ describe('IqamaRulesService', () => {
     expect(cfg.mode).toBe('shadow');
     expect(cfg.currentRevision).toBe(1);
     expect(cfg.versions).toHaveLength(1);
-    expect(cfg.effective).toEqual(DEFAULT_RULE_SET);
+    expect(cfg.cutover).toBe('2026-11-13');
+    expect(cfg.effective).toBeNull(); // before the cutover the legacy rules apply
     expect(cfg.today).toBe('2026-11-11');
     expect(cfg.defaultEffectiveFrom).toBe('2026-11-13');
+  });
+
+  it('getConfig returns the effective rules after the cutover, and reports bad stored rules', async () => {
+    jest.useRealTimers();
+    freezeDate('2026-11-20T20:00:00Z');
+    const ok = await makeStack({});
+    expect((await ok.service.getConfig()).effective).toEqual(DEFAULT_RULE_SET);
+
+    const bad = await makeStack({
+      rows: [{ ...versionRow(1, '2026-11-13'), settings: '{nope' }],
+    });
+    const cfg = await bad.service.getConfig();
+    expect(cfg.effective).toBeNull();
+    expect(cfg.effectiveError).toMatch(/not valid JSON/);
   });
 
   it('getCatalog exposes ranges and the fixed guardrails', async () => {
@@ -125,9 +141,9 @@ describe('IqamaRulesService', () => {
       const { service } = await makeStack({});
       const p = await service.preview({
         settings: json(withMaghrib(10)),
-        effectiveFrom: '2026-11-12',
+        effectiveFrom: '2026-11-14', // a Saturday
       });
-      expect(p.effectiveFrom).toBe('2026-11-12');
+      expect(p.effectiveFrom).toBe('2026-11-14');
     }, 60_000);
 
     it('rejects bad JSON, past dates and invalid rules', async () => {
@@ -167,6 +183,82 @@ describe('IqamaRulesService', () => {
       expect(rows).toHaveLength(2); // append-only: old row kept
       expect(invalidate).toHaveBeenCalledWith('2026-11-13', '2027-12-31');
     }, 60_000);
+
+    it('stores the reason and returns it with the versions', async () => {
+      const { service, rows, builder } = await makeStack({});
+      jest.spyOn(builder, 'invalidateCache').mockResolvedValue(undefined);
+      const settings = json(withMaghrib(10));
+      const { previewId } = await service.preview({ settings });
+      await service.createVersion(
+        {
+          settings,
+          previewId,
+          expectedRevision: 1,
+          reason: 'Longer Maghrib gap for the new schedule',
+        },
+        'admin',
+      );
+      expect(rows[1].reason).toBe('Longer Maghrib gap for the new schedule');
+      const cfg = await service.getConfig();
+      expect(cfg.versions.map((v) => v.reason)).toContain(
+        'Longer Maghrib gap for the new schedule',
+      );
+    }, 60_000);
+
+    describe('Fajr conflicts', () => {
+      // Real Vancouver data never clashes, so fake one conflict day per month.
+      const withConflicts = (builder: ScheduleBuilderService) => {
+        const original: ScheduleBuilderService['buildMonth'] =
+          builder.buildMonth.bind(builder);
+        jest.spyOn(builder, 'buildMonth').mockImplementation(async (m, o) => {
+          const days = await original(m, o);
+          days[14].fajr = { ...days[14].fajr, iqama_conflict: true };
+          return days;
+        });
+      };
+
+      it('preview lists the conflicts', async () => {
+        const { service, builder } = await makeStack({});
+        withConflicts(builder);
+        const p = await service.preview({ settings: json(withMaghrib(10)) });
+        expect(p.summary.conflictDays).toBeGreaterThan(0);
+        expect(p.conflicts[0]).toMatchObject({
+          prayer: 'fajr',
+          brokenLimit: 'fajr_ends_60_min_before_sunrise',
+          wonBy: 'azan_plus_3_min_gap',
+        });
+        expect(Object.keys(p.conflicts[0])).toEqual(
+          expect.arrayContaining(['date', 'azan', 'sunrise', 'iqama']),
+        );
+      }, 60_000);
+
+      it('PUT needs acknowledgeConflicts: true (422 otherwise), and the token survives the refusal', async () => {
+        const { service, builder, rows } = await makeStack({});
+        withConflicts(builder);
+        jest.spyOn(builder, 'invalidateCache').mockResolvedValue(undefined);
+        const settings = json(withMaghrib(10));
+        const { previewId } = await service.preview({ settings });
+        await expect(
+          service.createVersion(
+            { settings, previewId, expectedRevision: 1 },
+            'admin',
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'IQAMA_CONFLICTS_NOT_ACKNOWLEDGED' },
+        });
+        expect(rows).toHaveLength(1);
+        await service.createVersion(
+          {
+            settings,
+            previewId,
+            expectedRevision: 1,
+            acknowledgeConflicts: true,
+          },
+          'admin',
+        );
+        expect(rows).toHaveLength(2);
+      }, 60_000);
+    });
 
     it('409 when the revision is stale', async () => {
       const { service } = await makeStack({});

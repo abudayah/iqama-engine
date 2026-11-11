@@ -49,6 +49,14 @@ Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqa
   - [x] 4b.2 Catalog `guardrails.iqamaStepMinutes`; validator: rounding step must be a multiple of 5
   - [x] 4b.3 Tests (all days 2026–2035 on a mark, override 09:04 → 09:05, FLOOR stays floor, Fajr conflict); golden master unchanged (zero diffs)
 
+- [x] 4c. Phase 5: override overlap, history cutover, no silent fallback, reason, Fajr conflict (commit `phase 5`)
+  - [x] 4c.1 Newest override wins; 409 on same-prayer overlap; `scripts/report-override-overlaps.ts`
+  - [x] 4c.2 `IQAMA_RULES_CUTOVER` (default 2026-11-13): legacy before it (old Dhuhr DST logic kept), DB rules from it; seed version 1 at the cutover
+  - [x] 4c.3 `db` mode fails loudly (`IQAMA_RULES_MISSING` / `IQAMA_RULES_INVALID`); stored JSON validated at read time
+  - [x] 4c.4 Optional `reason` (migration `20261111000000_iqama_rule_reason`)
+  - [x] 4c.5 Fajr conflict: `iqama_conflict`, preview `conflicts`, `acknowledgeConflicts`
+  - _Requirements: 6, 8_
+
 - [ ] 5. Production cutover (see runbook)
   - [ ] 5.1 Check the production Node/ICU timezone data (America/Vancouver in January 2027 must be UTC-7)
   - [ ] 5.2 Migrate and seed

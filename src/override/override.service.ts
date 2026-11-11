@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { Dayjs } from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { IqamaTimes } from '../rules/rules.service';
@@ -7,6 +7,10 @@ import {
   formatHHmm,
   setTimeInTz,
 } from '../rules/time-utils';
+
+/** YYYY-MM-DD of a stored override boundary (Date from Prisma, or ISO string). */
+const ymd = (v: Date | string): string =>
+  (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
 
 export interface Override {
   id: number;
@@ -47,6 +51,48 @@ export class OverrideService {
   }
 
   /**
+   * Reject a new/changed override whose date range overlaps an active
+   * override for the SAME prayer (different prayers may overlap).
+   * Dates are YYYY-MM-DD, inclusive. `excludeId` skips the override being edited.
+   */
+  async assertNoOverlap(
+    prayer: string,
+    startDate: string,
+    endDate: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const clash = await this.findOverlaps(
+      prayer,
+      startDate,
+      endDate,
+      excludeId,
+    );
+    if (clash.length > 0) {
+      const c = clash[0];
+      throw new ConflictException(
+        `Override #${c.id} (${c.prayer} ${c.overrideType} ${c.value}, ${ymd(c.startDate)} to ${ymd(c.endDate)}) already covers ${prayer} within ${startDate} to ${endDate}. Edit or delete it first.`,
+      );
+    }
+  }
+
+  async findOverlaps(
+    prayer: string,
+    startDate: string,
+    endDate: string,
+    excludeId?: number,
+  ): Promise<Override[]> {
+    return this.prisma.$queryRaw<Override[]>`
+      SELECT * FROM "Override"
+      WHERE "prayer" = ${prayer}
+        AND substr("startDate", 1, 10) <= ${endDate}
+        AND substr("endDate",   1, 10) >= ${startDate}
+        AND "deletedAt" IS NULL
+        AND "id" != ${excludeId ?? -1}
+      ORDER BY "createdAt" DESC
+    `;
+  }
+
+  /**
    * Apply overrides to the rules-computed Iqama times.
    *
    * Priority rules enforced here:
@@ -70,7 +116,14 @@ export class OverrideService {
     const result = { ...rulesIqamaTimes };
     let hasOverrides = false;
 
-    for (const override of overrides) {
+    // Oldest first, so the NEWEST override for a prayer is applied last and wins.
+    const ordered = [...overrides].sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() ||
+        a.id - b.id,
+    );
+
+    for (const override of ordered) {
       const prayer = override.prayer as keyof IqamaTimes;
       // Skip overrides for unrecognised prayer names
       if (!(prayer in result)) continue;

@@ -87,6 +87,7 @@ model IqamaRuleVersion {
   id            Int      @id @default(autoincrement())
   effectiveFrom String   // 'YYYY-MM-DD' in masjid timezone
   settings      String   // JSON (RuleSet), validated on write
+  reason        String?  // optional note, max 500 chars (validated in the API)
   createdBy     String
   createdAt     DateTime @default(now())
 
