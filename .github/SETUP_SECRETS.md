@@ -10,10 +10,10 @@ This guide explains how to configure environment variables for the GitHub Action
 
 Navigate to: **Repository Settings → Secrets and variables → Actions → Secrets**
 
-| Secret Name      | Description                        | Example                             |
-| ---------------- | ---------------------------------- | ----------------------------------- |
-| `DATABASE_URL`   | MySQL connection string for Prisma | `mysql://user:pass@host:3306/iqama` |
-| `ADMIN_PASSWORD` | Password for admin endpoints       | Choose a strong password            |
+| Secret Name      | Description                                                                    | Example                   |
+| ---------------- | ------------------------------------------------------------------------------ | ------------------------- |
+| `DATABASE_URL`   | SQLite database URL (read by the app and by Prisma through the libSQL adapter) | `file:./prisma/db.sqlite` |
+| `ADMIN_PASSWORD` | Password for admin endpoints                                                   | Choose a strong password  |
 
 #### **Variables** (Non-Sensitive Configuration)
 
