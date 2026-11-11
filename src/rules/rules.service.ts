@@ -26,6 +26,8 @@ export interface WeeklyContext {
   fajrWeek: WeeklyFajrEntry[];
   /** Isha Azan times for each day in the Friday→Thursday window. */
   ishaWeek: Dayjs[];
+  /** Full raw times for the same 7 days (used by the DB rule engine). */
+  rawWeek?: { date: string; raw: RawPrayerTimes }[];
 }
 
 @Injectable()

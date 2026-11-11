@@ -1,11 +1,15 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { Dayjs } from 'dayjs';
 import dayjs from '../dayjs';
 import { AdhanAdapter, RawPrayerTimes } from '../adhan/adhan.adapter';
-import { RulesService, WeeklyContext } from '../rules/rules.service';
+import {
+  IqamaTimes,
+  RulesService,
+  WeeklyContext,
+} from '../rules/rules.service';
 import { WeeklyFajrEntry } from '../rules/fajr.rule';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +21,18 @@ import {
 import { isDstActive } from '../rules/dhuhr.rule';
 import { formatHHmm } from '../rules/time-utils';
 import { applyIqamaGuardrail } from '../rules/iqama-guardrail';
+import {
+  ParsedRuleVersion,
+  parseIqamaRulesMode,
+  parseRuleVersions,
+  resolveRuleSet,
+} from '../iqama-rules/iqama-rules.resolver';
+import { evaluateRule, toDayCtx } from '../iqama-rules/iqama-rules.evaluator';
+import {
+  IqamaRuleVersionRecord,
+  PRAYER_NAMES,
+  RuleSet,
+} from '../iqama-rules/iqama-rules.types';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
 import { resolveAdhanSettings } from '../adhan-config/adhan-config.resolver';
 import type {
@@ -58,8 +74,15 @@ function toYmd(v: Date | string): string {
   return (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
 }
 
+/** Per-call override of the IQAMA_RULES flag (used by the preview endpoint). */
+export interface BuildOptions {
+  /** 'legacy' = old rule functions; an array = evaluate these DB versions. */
+  rules?: 'legacy' | IqamaRuleVersionRecord[];
+}
+
 @Injectable()
 export class ScheduleBuilderService {
+  private readonly logger = new Logger(ScheduleBuilderService.name);
   private readonly timezone: string;
 
   /**
@@ -110,8 +133,30 @@ export class ScheduleBuilderService {
    * Build the full array of DailySchedule objects for a given month.
    * @param yearMonth - "YYYY-MM" string
    */
-  async buildMonth(yearMonth: string): Promise<DailySchedule[]> {
+  async buildMonth(
+    yearMonth: string,
+    opts?: BuildOptions,
+  ): Promise<DailySchedule[]> {
     const tz = this.timezone;
+
+    // Which rule engine: IQAMA_RULES flag, unless the caller forces one.
+    const mode =
+      opts?.rules === undefined
+        ? parseIqamaRulesMode(this.configService.get('app.iqamaRules'))
+        : opts.rules === 'legacy'
+          ? 'legacy'
+          : 'db';
+    let ruleVersions: ParsedRuleVersion[] = [];
+    if (mode !== 'legacy') {
+      const rows = Array.isArray(opts?.rules)
+        ? opts.rules
+        : await this.prisma.iqamaRuleVersion.findMany({
+            orderBy: { effectiveFrom: 'asc' },
+          });
+      ruleVersions = parseRuleVersions(rows, (id) =>
+        this.logger.error(`IqamaRuleVersion ${id} has invalid JSON; ignored`),
+      );
+    }
 
     // Load adhan config once per month build
     const adhanConfig = await this.loadAdhanConfig();
@@ -214,7 +259,25 @@ export class ScheduleBuilderService {
       const weeklyCtx = getWeeklyCtx(date);
 
       // (d) Compute iqama times via FR1–FR4 (weekly rules for Fajr & Isha)
-      const iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
+      const ruleSet =
+        mode === 'legacy' ? undefined : resolveRuleSet(date, ruleVersions);
+      let iqamaTimes: IqamaTimes;
+      if (mode === 'db' && ruleSet) {
+        iqamaTimes = this.computeDbIqama(ruleSet, date, raw, weeklyCtx);
+      } else {
+        iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
+        if (mode === 'shadow' && ruleSet) {
+          this.logShadowDiff(
+            date,
+            iqamaTimes,
+            this.computeDbIqama(ruleSet, date, raw, weeklyCtx),
+          );
+        } else if (mode !== 'legacy' && !ruleSet) {
+          this.logger.warn(
+            `No IqamaRuleVersion covers ${date}; using legacy rules`,
+          );
+        }
+      }
 
       // (e) Build rawAzanMap for OFFSET override calculations
       const rawAzanMap: Record<string, Dayjs> = {
@@ -391,6 +454,7 @@ export class ScheduleBuilderService {
 
     const fajrWeek: WeeklyFajrEntry[] = [];
     const ishaWeek: Dayjs[] = [];
+    const rawWeek: { date: string; raw: RawPrayerTimes }[] = [];
 
     for (let i = 0; i < 7; i++) {
       const weekDate = weekStart.add(i, 'day');
@@ -403,9 +467,44 @@ export class ScheduleBuilderService {
       );
       fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
       ishaWeek.push(weekRaw.isha);
+      rawWeek.push({ date: weekDateStr, raw: weekRaw });
     }
 
-    return { fajrWeek, ishaWeek };
+    return { fajrWeek, ishaWeek, rawWeek };
+  }
+
+  /** Rules from the DB rule set (base -> modifiers); overrides/guardrails come after. */
+  private computeDbIqama(
+    rules: RuleSet,
+    date: string,
+    raw: RawPrayerTimes,
+    weeklyCtx: WeeklyContext,
+  ): IqamaTimes {
+    const out = {} as IqamaTimes;
+    for (const p of PRAYER_NAMES) {
+      const ctx = (d: string, r: RawPrayerTimes) =>
+        toDayCtx(d, r[p], p === 'fajr' ? r.sunrise : undefined);
+      out[p] = evaluateRule(
+        rules[p],
+        ctx(date, raw),
+        weeklyCtx.rawWeek?.map((w) => ctx(w.date, w.raw)),
+      );
+    }
+    return out;
+  }
+
+  private logShadowDiff(
+    date: string,
+    legacy: IqamaTimes,
+    db: IqamaTimes,
+  ): void {
+    for (const p of PRAYER_NAMES) {
+      if (legacy[p] !== db[p]) {
+        this.logger.warn(
+          `[iqama shadow] ${date} ${p}: legacy=${legacy[p]} db=${db[p]}`,
+        );
+      }
+    }
   }
 
   async getMonth(yearMonth: string): Promise<DailySchedule[]> {

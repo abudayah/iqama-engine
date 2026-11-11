@@ -126,3 +126,14 @@ export interface ValidationResult {
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
 }
+
+/** A stored rule version (mirrors the IqamaRuleVersion table). */
+export interface IqamaRuleVersionRecord {
+  id: number;
+  effectiveFrom: string; // YYYY-MM-DD
+  settings: string; // JSON (RuleSet)
+  createdBy: string;
+  createdAt: Date;
+}
+
+export type IqamaRulesMode = 'legacy' | 'shadow' | 'db';

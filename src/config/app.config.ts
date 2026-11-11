@@ -5,5 +5,7 @@ export const appConfig = registerAs('app', () => ({
   masjidLatitude: parseFloat(process.env.MASJID_LATITUDE ?? '49.2652047'),
   masjidLongitude: parseFloat(process.env.MASJID_LONGITUDE ?? '-122.7878735'),
   masjidTimezone: process.env.MASJID_TIMEZONE ?? 'America/Vancouver',
+  // legacy | shadow | db — which iqama rule engine builds the schedule.
+  iqamaRules: process.env.IQAMA_RULES ?? 'legacy',
   databaseUrl: process.env.DATABASE_URL,
 }));

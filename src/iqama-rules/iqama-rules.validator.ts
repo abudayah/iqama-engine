@@ -3,6 +3,7 @@ import {
   MIN_IQAMA_GAP_MIN,
   toMin,
 } from '../rules/iqama-guardrail';
+import { RANGES } from './iqama-rules.catalog';
 import {
   LOCKABLE_PRAYERS,
   PRAYER_NAMES,
@@ -15,7 +16,7 @@ import {
 } from './iqama-rules.types';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-const ROUND_STEPS = [1, 5, 10, 15, 30, 60];
+const ROUND_STEPS: readonly number[] = RANGES.roundingSteps;
 const isInt = (n: unknown): n is number =>
   typeof n === 'number' && Number.isInteger(n);
 const inRange = (n: unknown, lo: number, hi: number): n is number =>
@@ -45,7 +46,9 @@ function validatePrayer(
   const b = rule.base;
   switch (b.type) {
     case 'OFFSET':
-      if (!inRange(b.minutes, -120, 120))
+      if (
+        !inRange(b.minutes, RANGES.offsetMinutes.min, RANGES.offsetMinutes.max)
+      )
         err('.base.minutes', 'must be a whole number from -120 to 120');
       break;
     case 'FIXED_TIME':
@@ -53,14 +56,16 @@ function validatePrayer(
       break;
     case 'SCALED_GAP': {
       const pts = b.points;
-      if (!Array.isArray(pts) || pts.length < 2) {
+      if (!Array.isArray(pts) || pts.length < RANGES.scaledGapMinPoints) {
         err('.base.points', 'at least 2 points are required');
         break;
       }
       pts.forEach((p, i) => {
         if (!HHMM.test(p?.azan ?? ''))
           err(`.base.points[${i}].azan`, 'must be HH:mm');
-        if (!inRange(p?.gapMinutes, 0, 120))
+        if (
+          !inRange(p?.gapMinutes, RANGES.gapMinutes.min, RANGES.gapMinutes.max)
+        )
           err(
             `.base.points[${i}].gapMinutes`,
             'must be a whole number from 0 to 120',
@@ -116,7 +121,13 @@ function validatePrayer(
   const lim = rule.limits;
   if (lim) {
     if (lim.minAfterAzan !== undefined) {
-      if (!inRange(lim.minAfterAzan, 0, 120))
+      if (
+        !inRange(
+          lim.minAfterAzan,
+          RANGES.minAfterAzan.min,
+          RANGES.minAfterAzan.max,
+        )
+      )
         err('.limits.minAfterAzan', 'must be a whole number from 0 to 120');
       else if (lim.minAfterAzan < MIN_IQAMA_GAP_MIN)
         warn(
@@ -127,7 +138,13 @@ function validatePrayer(
     if (lim.latestBeforeSunrise !== undefined) {
       if (prayer !== 'fajr')
         err('.limits.latestBeforeSunrise', 'only Fajr has a sunrise limit');
-      else if (!inRange(lim.latestBeforeSunrise, 0, 240))
+      else if (
+        !inRange(
+          lim.latestBeforeSunrise,
+          RANGES.latestBeforeSunrise.min,
+          RANGES.latestBeforeSunrise.max,
+        )
+      )
         err(
           '.limits.latestBeforeSunrise',
           'must be a whole number from 0 to 240',
@@ -153,7 +170,7 @@ function validatePrayer(
     for (const [k, v] of Object.entries(rule.weekdayAdjust)) {
       if (!(WEEKDAYS as readonly string[]).includes(k))
         err(`.weekdayAdjust.${k}`, 'unknown weekday');
-      else if (!inRange(v, -60, 60))
+      else if (!inRange(v, RANGES.weekdayAdjust.min, RANGES.weekdayAdjust.max))
         err(`.weekdayAdjust.${k}`, 'must be a whole number from -60 to 60');
     }
   }

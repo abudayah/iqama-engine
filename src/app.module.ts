@@ -7,6 +7,7 @@ import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { HijriCalendarModule } from './hijri-calendar/hijri-calendar.module';
 import { AdhanConfigModule } from './adhan-config/adhan-config.module';
+import { IqamaRulesModule } from './iqama-rules/iqama-rules.module';
 import { join } from 'path';
 
 @Module({
@@ -26,6 +27,7 @@ import { join } from 'path';
     HealthModule,
     HijriCalendarModule,
     AdhanConfigModule,
+    IqamaRulesModule,
   ],
   controllers: [],
   providers: [],

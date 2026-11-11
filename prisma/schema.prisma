@@ -79,3 +79,16 @@ model AdhanConfigPeriod {
 
   @@index([startDate, endDate])
 }
+
+/// Iqama rule set (all five prayers), append-only, versioned by effective date.
+/// The active version for a date is the one with the greatest effectiveFrom <= date
+/// (ties: higher id wins). Mirrors AdhanConfigVersion.
+model IqamaRuleVersion {
+  id            Int      @id @default(autoincrement())
+  effectiveFrom String   // 'YYYY-MM-DD' in masjid timezone
+  settings      String   // JSON (RuleSet), validated on write
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@index([effectiveFrom])
+}
