@@ -1,1 +1,0 @@
-{"version":3,"file":"maghrib.rule.js","sourceRoot":"","sources":["../../../src/rules/maghrib.rule.ts"],"names":[],"mappings":";;AASA,kDAIC;AAZD,6CAA6D;AAQ7D,SAAgB,mBAAmB,CAAC,WAAkB;IAEpD,MAAM,gBAAgB,GAAG,WAAW,CAAC,OAAO,CAAC,QAAQ,CAAC,CAAC;IACvD,OAAO,IAAA,uBAAU,EAAC,IAAA,8BAAiB,EAAC,gBAAgB,CAAC,GAAG,CAAC,CAAC,EAAE,QAAQ,CAAC,CAAC,CAAC,CAAC;AAC1E,CAAC"}

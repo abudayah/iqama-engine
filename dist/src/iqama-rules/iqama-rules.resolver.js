@@ -1,17 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IqamaRulesError = exports.parseCutover = exports.DEFAULT_IQAMA_RULES_CUTOVER = void 0;
-exports.parseIqamaRulesMode = parseIqamaRulesMode;
+exports.IqamaRulesError = void 0;
 exports.resolveRuleVersion = resolveRuleVersion;
 exports.loadRuleSet = loadRuleSet;
 const common_1 = require("@nestjs/common");
-var iqama_rules_cutover_1 = require("./iqama-rules.cutover");
-Object.defineProperty(exports, "DEFAULT_IQAMA_RULES_CUTOVER", { enumerable: true, get: function () { return iqama_rules_cutover_1.DEFAULT_IQAMA_RULES_CUTOVER; } });
-Object.defineProperty(exports, "parseCutover", { enumerable: true, get: function () { return iqama_rules_cutover_1.parseCutover; } });
 const iqama_rules_validator_1 = require("./iqama-rules.validator");
-function parseIqamaRulesMode(v) {
-    return v === 'shadow' || v === 'db' ? v : 'legacy';
-}
 class IqamaRulesError extends common_1.HttpException {
     code;
     issues;
@@ -32,7 +25,16 @@ function resolveRuleVersion(date, versions) {
             (v.effectiveFrom === best.effectiveFrom && v.id > best.id))
             best = v;
     }
-    return best;
+    if (best)
+        return best;
+    let earliest;
+    for (const v of versions) {
+        if (!earliest ||
+            v.effectiveFrom < earliest.effectiveFrom ||
+            (v.effectiveFrom === earliest.effectiveFrom && v.id < earliest.id))
+            earliest = v;
+    }
+    return earliest;
 }
 function loadRuleSet(version) {
     let parsed;

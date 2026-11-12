@@ -22,8 +22,7 @@ export declare class IqamaRulesService {
     private consumePreviewId;
     private validateDraft;
     getConfig(): Promise<{
-        mode: import("./iqama-rules.types").IqamaRulesMode;
-        cutover: string;
+        mode: "db";
         currentRevision: number;
         today: string;
         timezone: string;

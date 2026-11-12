@@ -2,11 +2,33 @@ import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.ser
 import { IqamaRulesService } from './iqama-rules.service';
 import { IqamaRuleVersionRecord, RuleSet } from './iqama-rules.types';
 export declare const TEST_TZ = "Etc/GMT+7";
-export declare const TEST_CUTOVER = "2026-11-13";
+export declare const TEST_V1_DATE = "2026-11-13";
 export declare const versionRow: (id: number, effectiveFrom: string, rules?: RuleSet) => IqamaRuleVersionRecord;
+export declare function defaultAdhanConfig(): {
+    versions: {
+        id: number;
+        effectiveFrom: string;
+        settings: string;
+        createdBy: string;
+        createdAt: Date;
+    }[];
+    periods: {
+        id: number;
+        label: string;
+        startDate: string;
+        endDate: string;
+        settings: string;
+        createdBy: string;
+        createdAt: Date;
+        updatedAt: Date;
+        deletedAt: null;
+    }[];
+};
 export declare function makeStack(opts: {
-    mode?: string;
     rows?: IqamaRuleVersionRecord[];
+    adhanConfig?: boolean;
+    tz?: string;
+    overrides?: unknown[];
 }): Promise<{
     builder: ScheduleBuilderService;
     service: IqamaRulesService;

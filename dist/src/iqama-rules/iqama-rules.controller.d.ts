@@ -5,8 +5,7 @@ export declare class IqamaRulesController {
     private readonly service;
     constructor(service: IqamaRulesService);
     getConfig(): Promise<{
-        mode: import("./iqama-rules.types").IqamaRulesMode;
-        cutover: string;
+        mode: "db";
         currentRevision: number;
         today: string;
         timezone: string;

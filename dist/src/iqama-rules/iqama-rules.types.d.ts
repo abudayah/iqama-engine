@@ -72,4 +72,4 @@ export interface IqamaRuleVersionRecord {
     reason?: string | null;
     createdAt: Date;
 }
-export type IqamaRulesMode = 'legacy' | 'shadow' | 'db';
+export type IqamaTimes = Record<PrayerName, string>;

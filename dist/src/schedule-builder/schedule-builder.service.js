@@ -22,12 +22,11 @@ const config_1 = require("@nestjs/config");
 const cache_manager_1 = require("@nestjs/cache-manager");
 const dayjs_1 = __importDefault(require("../dayjs"));
 const adhan_adapter_1 = require("../adhan/adhan.adapter");
-const rules_service_1 = require("../rules/rules.service");
 const override_service_1 = require("../override/override.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const qiyam_config_service_1 = require("../hijri-calendar/qiyam-config.service");
 const hijri_utils_1 = require("../hijri-calendar/hijri-utils");
-const dhuhr_rule_1 = require("../rules/dhuhr.rule");
+const is_dst_1 = require("./is-dst");
 const time_utils_1 = require("../rules/time-utils");
 const iqama_guardrail_1 = require("../rules/iqama-guardrail");
 const iqama_rules_resolver_1 = require("../iqama-rules/iqama-rules.resolver");
@@ -50,7 +49,6 @@ function toYmd(v) {
 }
 let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderService {
     adhanAdapter;
-    rulesService;
     overrideService;
     prisma;
     configService;
@@ -59,9 +57,8 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
     logger = new common_1.Logger(ScheduleBuilderService_1.name);
     timezone;
     inFlight = new Map();
-    constructor(adhanAdapter, rulesService, overrideService, prisma, configService, qiyamConfigService, cacheManager) {
+    constructor(adhanAdapter, overrideService, prisma, configService, qiyamConfigService, cacheManager) {
         this.adhanAdapter = adhanAdapter;
-        this.rulesService = rulesService;
         this.overrideService = overrideService;
         this.prisma = prisma;
         this.configService = configService;
@@ -86,28 +83,16 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
     }
     async buildMonth(yearMonth, opts) {
         const tz = this.timezone;
-        const mode = opts?.rules === undefined
-            ? (0, iqama_rules_resolver_1.parseIqamaRulesMode)(this.configService.get('app.iqamaRules'))
-            : opts.rules === 'legacy'
-                ? 'legacy'
-                : 'db';
-        let ruleRows = [];
-        if (mode !== 'legacy') {
-            ruleRows = Array.isArray(opts?.rules)
-                ? opts.rules
-                : await this.prisma.iqamaRuleVersion.findMany({
-                    orderBy: { effectiveFrom: 'asc' },
-                });
-        }
-        const cutover = (0, iqama_rules_resolver_1.parseCutover)(this.configService.get('app.iqamaRulesCutover'));
+        const ruleRows = opts?.rules ??
+            (await this.prisma.iqamaRuleVersion.findMany({
+                orderBy: { effectiveFrom: 'asc' },
+            }));
         const ruleSetCache = new Map();
         const ruleSetFor = (date) => {
-            if (mode === 'legacy' || date < cutover)
-                return undefined;
             try {
                 const row = (0, iqama_rules_resolver_1.resolveRuleVersion)(date, ruleRows);
                 if (!row) {
-                    throw new iqama_rules_resolver_1.IqamaRulesError('IQAMA_RULES_MISSING', `No IqamaRuleVersion covers ${date} (cutover ${cutover}). Run the seed or add a version.`);
+                    throw new iqama_rules_resolver_1.IqamaRulesError('IQAMA_RULES_MISSING', `No IqamaRuleVersion exists (needed for ${date}). Run the seed or add a version.`);
                 }
                 let rules = ruleSetCache.get(row.id);
                 if (!rules) {
@@ -117,12 +102,10 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
                 return rules;
             }
             catch (e) {
-                if (!(e instanceof iqama_rules_resolver_1.IqamaRulesError))
-                    throw e;
-                this.logger.error(`[iqama rules] ${e.code}: ${e.message}`);
-                if (mode === 'db')
-                    throw e;
-                return undefined;
+                if (e instanceof iqama_rules_resolver_1.IqamaRulesError) {
+                    this.logger.error(`[iqama rules] ${e.code}: ${e.message}`);
+                }
+                throw e;
             }
         };
         const adhanConfig = await this.loadAdhanConfig();
@@ -172,16 +155,7 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
             const overrides = monthOverrides.filter((o) => toYmd(o.startDate) <= date && toYmd(o.endDate) >= date);
             const weeklyCtx = getWeeklyCtx(date);
             const ruleSet = ruleSetFor(date);
-            let iqamaTimes;
-            if (mode === 'db' && ruleSet) {
-                iqamaTimes = this.computeDbIqama(ruleSet, date, raw, weeklyCtx);
-            }
-            else {
-                iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
-                if (mode === 'shadow' && ruleSet) {
-                    this.logShadowDiff(date, iqamaTimes, this.computeDbIqama(ruleSet, date, raw, weeklyCtx));
-                }
-            }
+            const iqamaTimes = this.computeIqama(ruleSet, date, raw, weeklyCtx);
             const rawAzanMap = {
                 fajr: raw.fajr,
                 dhuhr: raw.dhuhr,
@@ -193,7 +167,7 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
             const finalIqama = { ...overridden };
             const clamped = {};
             for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
-                const g = (0, iqama_guardrail_1.applyIqamaGuardrail)(overridden[key], rawAzanMap[key], key === 'fajr' ? raw.sunrise : undefined, mode === 'db' && ruleSet?.[key].rounding?.mode === 'FLOOR');
+                const g = (0, iqama_guardrail_1.applyIqamaGuardrail)(overridden[key], rawAzanMap[key], key === 'fajr' ? raw.sunrise : undefined, ruleSet[key].rounding?.mode === 'FLOOR');
                 finalIqama[key] = g.iqama;
                 clamped[key] = g.clamped;
             }
@@ -212,7 +186,7 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
                 date,
                 hijri_date: hijriDate,
                 day_of_week: dateDayjs.format('dddd'),
-                is_dst: (0, dhuhr_rule_1.isDstActive)(date, tz),
+                is_dst: (0, is_dst_1.isDstActive)(date, tz),
                 ...(fajrConflict ? { iqama_conflict: true } : {}),
                 fajr: {
                     azan: (0, time_utils_1.formatHHmm)(raw.fajr),
@@ -293,33 +267,22 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
         const dayOfWeek = d.day();
         const daysSinceFriday = (dayOfWeek + 2) % 7;
         const weekStart = d.subtract(daysSinceFriday, 'day');
-        const fajrWeek = [];
-        const ishaWeek = [];
         const rawWeek = [];
         for (let i = 0; i < 7; i++) {
             const weekDate = weekStart.add(i, 'day');
             const weekDateStr = weekDate.format('YYYY-MM-DD');
             const { raw: weekRaw } = this.resolveRawTimes(weekDateStr, tz, adhanConfig);
-            fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
-            ishaWeek.push(weekRaw.isha);
             rawWeek.push({ date: weekDateStr, raw: weekRaw });
         }
-        return { fajrWeek, ishaWeek, rawWeek };
+        return rawWeek;
     }
-    computeDbIqama(rules, date, raw, weeklyCtx) {
+    computeIqama(rules, date, raw, week) {
         const out = {};
         for (const p of iqama_rules_types_1.PRAYER_NAMES) {
             const ctx = (d, r) => (0, iqama_rules_evaluator_1.toDayCtx)(d, r[p], p === 'fajr' ? r.sunrise : undefined);
-            out[p] = (0, iqama_rules_evaluator_1.evaluateRule)(rules[p], ctx(date, raw), weeklyCtx.rawWeek?.map((w) => ctx(w.date, w.raw)));
+            out[p] = (0, iqama_rules_evaluator_1.evaluateRule)(rules[p], ctx(date, raw), week.map((w) => ctx(w.date, w.raw)));
         }
         return out;
-    }
-    logShadowDiff(date, legacy, db) {
-        for (const p of iqama_rules_types_1.PRAYER_NAMES) {
-            if (legacy[p] !== db[p]) {
-                this.logger.warn(`[iqama shadow] ${date} ${p}: legacy=${legacy[p]} db=${db[p]}`);
-            }
-        }
     }
     async getMonth(yearMonth) {
         const cacheKey = `schedule:${yearMonth}`;
@@ -367,9 +330,8 @@ let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderSer
 exports.ScheduleBuilderService = ScheduleBuilderService;
 exports.ScheduleBuilderService = ScheduleBuilderService = ScheduleBuilderService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(6, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __param(5, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
     __metadata("design:paramtypes", [adhan_adapter_1.AdhanAdapter,
-        rules_service_1.RulesService,
         override_service_1.OverrideService,
         prisma_service_1.PrismaService,
         config_1.ConfigService,

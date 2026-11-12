@@ -1,6 +1,6 @@
 import { Dayjs } from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { IqamaTimes } from '../rules/rules.service';
+import { IqamaTimes } from '../iqama-rules/iqama-rules.types';
 export interface Override {
     id: number;
     prayer: string;

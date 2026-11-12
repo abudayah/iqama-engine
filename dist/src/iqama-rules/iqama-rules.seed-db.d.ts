@@ -1,3 +1,4 @@
+export declare const SEED_EFFECTIVE_FROM = "2026-11-13";
 export interface IqamaRuleSeedClient {
     iqamaRuleVersion: {
         count(): Promise<number>;

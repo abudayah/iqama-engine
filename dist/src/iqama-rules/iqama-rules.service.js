@@ -149,7 +149,6 @@ let IqamaRulesService = class IqamaRulesService {
     }
     async getConfig() {
         const today = this.today();
-        const cutover = (0, iqama_rules_resolver_1.parseCutover)(this.configService.get('app.iqamaRulesCutover'));
         const [versions, currentRevision] = await Promise.all([
             this.allVersions(),
             this.latestVersionId(),
@@ -172,13 +171,12 @@ let IqamaRulesService = class IqamaRulesService {
                 error,
             };
         };
-        const effectiveRow = today < cutover ? undefined : (0, iqama_rules_resolver_1.resolveRuleVersion)(today, versions);
+        const effectiveRow = (0, iqama_rules_resolver_1.resolveRuleVersion)(today, versions);
         const latestRow = [...versions]
             .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom) || a.id - b.id)
             .at(-1);
         return {
-            mode: (0, iqama_rules_resolver_1.parseIqamaRulesMode)(this.configService.get('app.iqamaRules')),
-            cutover,
+            mode: 'db',
             currentRevision,
             today,
             timezone: this.timezone,
@@ -213,7 +211,7 @@ let IqamaRulesService = class IqamaRulesService {
             createdBy: 'preview',
             createdAt: new Date(),
         };
-        const currentRules = versions.length > 0 ? versions : 'legacy';
+        const currentRules = versions;
         const proposedRules = [...versions, proposedRecord];
         const to = addDays(effectiveFrom, SCAN_DAYS - 1);
         const months = [];

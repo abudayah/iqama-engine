@@ -5,8 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setTimeInTz = setTimeInTz;
 exports.ceilingToNearest5 = ceilingToNearest5;
-exports.floorToNearest5 = floorToNearest5;
-exports.ceilingToNearest30 = ceilingToNearest30;
 exports.formatHHmm = formatHHmm;
 const dayjs_1 = __importDefault(require("dayjs"));
 function setTimeInTz(dayjsObj, hours, minutes, seconds = 0) {
@@ -38,25 +36,6 @@ function ceilingToNearest5(dayjsObj) {
     if (remainder === 0)
         return bumped;
     return bumped.add(5 - remainder, 'minute');
-}
-function floorToNearest5(dayjsObj) {
-    const base = stripSubMinute(dayjsObj);
-    const m = base.minute();
-    const remainder = m % 5;
-    if (remainder === 0)
-        return base;
-    return base.subtract(remainder, 'minute');
-}
-function ceilingToNearest30(dayjsObj) {
-    const base = stripSubMinute(dayjsObj);
-    const bumped = dayjsObj.second() > 0 || dayjsObj.millisecond() > 0
-        ? base.add(1, 'minute')
-        : base;
-    const m = bumped.minute();
-    const remainder = m % 30;
-    if (remainder === 0)
-        return bumped;
-    return bumped.add(30 - remainder, 'minute');
 }
 function formatHHmm(dayjsObj) {
     return dayjsObj.format('HH:mm');
