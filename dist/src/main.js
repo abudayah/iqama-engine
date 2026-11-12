@@ -2,9 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const app_module_1 = require("./app.module");
+const tzdata_guard_1 = require("./config/tzdata-guard");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    (0, tzdata_guard_1.warnIfStaleTzdata)(app.get(config_1.ConfigService).get('app.masjidTimezone') ?? '');
     app.use((_req, res, next) => {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Pragma', 'no-cache');

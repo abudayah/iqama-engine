@@ -5,7 +5,11 @@ import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
+import { IqamaRuleVersionRecord } from '../iqama-rules/iqama-rules.types';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
+export interface BuildOptions {
+    rules?: 'legacy' | IqamaRuleVersionRecord[];
+}
 export declare class ScheduleBuilderService {
     private readonly adhanAdapter;
     private readonly rulesService;
@@ -14,12 +18,16 @@ export declare class ScheduleBuilderService {
     private readonly configService;
     private readonly qiyamConfigService;
     private cacheManager;
+    private readonly logger;
     private readonly timezone;
     private readonly inFlight;
     constructor(adhanAdapter: AdhanAdapter, rulesService: RulesService, overrideService: OverrideService, prisma: PrismaService, configService: ConfigService, qiyamConfigService: QiyamConfigService, cacheManager: Cache);
     private loadAdhanConfig;
-    buildMonth(yearMonth: string): Promise<DailySchedule[]>;
+    buildMonth(yearMonth: string, opts?: BuildOptions): Promise<DailySchedule[]>;
+    private resolveRawTimes;
     private buildWeeklyContext;
+    private computeDbIqama;
+    private logShadowDiff;
     getMonth(yearMonth: string): Promise<DailySchedule[]>;
     invalidateCache(startDate?: string, endDate?: string): Promise<void>;
 }

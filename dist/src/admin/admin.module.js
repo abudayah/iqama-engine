@@ -11,12 +11,13 @@ const common_1 = require("@nestjs/common");
 const admin_controller_1 = require("./admin.controller");
 const prisma_module_1 = require("../prisma/prisma.module");
 const schedule_builder_module_1 = require("../schedule-builder/schedule-builder.module");
+const override_module_1 = require("../override/override.module");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
 exports.AdminModule = AdminModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, schedule_builder_module_1.ScheduleBuilderModule],
+        imports: [prisma_module_1.PrismaModule, schedule_builder_module_1.ScheduleBuilderModule, override_module_1.OverrideModule],
         controllers: [admin_controller_1.AdminController],
     })
 ], AdminModule);

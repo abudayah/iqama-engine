@@ -19,14 +19,18 @@ const schedule_builder_service_1 = require("../schedule-builder/schedule-builder
 const create_override_dto_1 = require("./dto/create-override.dto");
 const update_override_dto_1 = require("./dto/update-override.dto");
 const api_key_guard_1 = require("../auth/api-key.guard");
+const override_service_1 = require("../override/override.service");
 let AdminController = class AdminController {
     prisma;
     scheduleBuilder;
-    constructor(prisma, scheduleBuilder) {
+    overrideService;
+    constructor(prisma, scheduleBuilder, overrideService) {
         this.prisma = prisma;
         this.scheduleBuilder = scheduleBuilder;
+        this.overrideService = overrideService;
     }
     async createOverride(dto) {
+        await this.overrideService.assertNoOverlap(dto.prayer, new Date(dto.startDate).toISOString().slice(0, 10), new Date(dto.endDate).toISOString().slice(0, 10));
         const override = await this.prisma.override.create({
             data: {
                 prayer: dto.prayer,
@@ -62,6 +66,11 @@ let AdminController = class AdminController {
         if (!existing) {
             throw new common_1.NotFoundException(`Override with ID ${id} not found`);
         }
+        await this.overrideService.assertNoOverlap(dto.prayer ?? existing.prayer, dto.startDate
+            ? new Date(dto.startDate).toISOString().slice(0, 10)
+            : existing.startDate.toISOString().slice(0, 10), dto.endDate
+            ? new Date(dto.endDate).toISOString().slice(0, 10)
+            : existing.endDate.toISOString().slice(0, 10), id);
         const updated = await this.prisma.override.update({
             where: { id },
             data: {
@@ -164,6 +173,7 @@ exports.AdminController = AdminController = __decorate([
     (0, common_1.Controller)('api/v1/admin'),
     (0, common_1.UseGuards)(api_key_guard_1.ApiKeyGuard),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        schedule_builder_service_1.ScheduleBuilderService])
+        schedule_builder_service_1.ScheduleBuilderService,
+        override_service_1.OverrideService])
 ], AdminController);
 //# sourceMappingURL=admin.controller.js.map

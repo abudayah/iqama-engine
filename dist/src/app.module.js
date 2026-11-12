@@ -16,6 +16,7 @@ const admin_module_1 = require("./admin/admin.module");
 const health_module_1 = require("./health/health.module");
 const hijri_calendar_module_1 = require("./hijri-calendar/hijri-calendar.module");
 const adhan_config_module_1 = require("./adhan-config/adhan-config.module");
+const iqama_rules_module_1 = require("./iqama-rules/iqama-rules.module");
 const path_1 = require("path");
 let AppModule = class AppModule {
 };
@@ -38,6 +39,7 @@ exports.AppModule = AppModule = __decorate([
             health_module_1.HealthModule,
             hijri_calendar_module_1.HijriCalendarModule,
             adhan_config_module_1.AdhanConfigModule,
+            iqama_rules_module_1.IqamaRulesModule,
         ],
         controllers: [],
         providers: [],

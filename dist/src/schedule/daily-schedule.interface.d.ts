@@ -2,12 +2,15 @@ export interface PrayerEntry {
     azan: string;
     iqama: string;
     azan_customized?: boolean;
+    iqama_clamped?: boolean;
+    iqama_conflict?: boolean;
 }
 export interface DailySchedule {
     date: string;
     hijri_date: string;
     day_of_week: string;
     is_dst: boolean;
+    iqama_conflict?: boolean;
     fajr: PrayerEntry;
     sunrise: string;
     dhuhr: PrayerEntry;

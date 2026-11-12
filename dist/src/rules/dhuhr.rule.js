@@ -6,11 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.computeDhuhrIqama = computeDhuhrIqama;
 exports.isDstActive = isDstActive;
 const dayjs_1 = __importDefault(require("../dayjs"));
-function computeDhuhrIqama(date, tz) {
+function computeDhuhrIqama(date, tz, cutover) {
     const d = dayjs_1.default.tz(date, tz);
-    const jan1 = d.startOf('year');
-    const isDst = d.utcOffset() > jan1.utcOffset();
-    const baseTime = isDst ? '13:45' : '12:45';
+    const baseTime = date < cutover && !isDstActive(date, tz) ? '12:45' : '13:45';
     if (d.day() === 5) {
         const [hours, minutes] = baseTime.split(':').map(Number);
         const totalMinutes = hours * 60 + minutes - 5;

@@ -13,24 +13,45 @@ exports.OverrideService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const time_utils_1 = require("../rules/time-utils");
+const ymd = (v) => (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
 let OverrideService = class OverrideService {
     prisma;
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getOverridesForDate(date) {
+    async getOverridesForRange(startDate, endDate) {
         return this.prisma.$queryRaw `
       SELECT * FROM "Override"
-      WHERE substr("startDate", 1, 10) <= ${date}
-        AND substr("endDate",   1, 10) >= ${date}
+      WHERE substr("startDate", 1, 10) <= ${endDate}
+        AND substr("endDate",   1, 10) >= ${startDate}
         AND "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
+    `;
+    }
+    async assertNoOverlap(prayer, startDate, endDate, excludeId) {
+        const clash = await this.findOverlaps(prayer, startDate, endDate, excludeId);
+        if (clash.length > 0) {
+            const c = clash[0];
+            throw new common_1.ConflictException(`Override #${c.id} (${c.prayer} ${c.overrideType} ${c.value}, ${ymd(c.startDate)} to ${ymd(c.endDate)}) already covers ${prayer} within ${startDate} to ${endDate}. Edit or delete it first.`);
+        }
+    }
+    async findOverlaps(prayer, startDate, endDate, excludeId) {
+        return this.prisma.$queryRaw `
+      SELECT * FROM "Override"
+      WHERE "prayer" = ${prayer}
+        AND substr("startDate", 1, 10) <= ${endDate}
+        AND substr("endDate",   1, 10) >= ${startDate}
+        AND "deletedAt" IS NULL
+        AND "id" != ${excludeId ?? -1}
       ORDER BY "createdAt" DESC
     `;
     }
     applyOverrides(rawAzanTimes, rulesIqamaTimes, overrides) {
         const result = { ...rulesIqamaTimes };
         let hasOverrides = false;
-        for (const override of overrides) {
+        const ordered = [...overrides].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() ||
+            a.id - b.id);
+        for (const override of ordered) {
             const prayer = override.prayer;
             if (!(prayer in result))
                 continue;

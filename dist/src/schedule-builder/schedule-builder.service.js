@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var ScheduleBuilderService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ScheduleBuilderService = void 0;
 const common_1 = require("@nestjs/common");
@@ -28,6 +29,10 @@ const qiyam_config_service_1 = require("../hijri-calendar/qiyam-config.service")
 const hijri_utils_1 = require("../hijri-calendar/hijri-utils");
 const dhuhr_rule_1 = require("../rules/dhuhr.rule");
 const time_utils_1 = require("../rules/time-utils");
+const iqama_guardrail_1 = require("../rules/iqama-guardrail");
+const iqama_rules_resolver_1 = require("../iqama-rules/iqama-rules.resolver");
+const iqama_rules_evaluator_1 = require("../iqama-rules/iqama-rules.evaluator");
+const iqama_rules_types_1 = require("../iqama-rules/iqama-rules.types");
 const adhan_config_resolver_1 = require("../adhan-config/adhan-config.resolver");
 const FALLBACK_EID_PRAYER_1 = '07:00';
 const FALLBACK_EID_PRAYER_2 = '08:30';
@@ -40,7 +45,10 @@ function isAstronomicalEidDay(date) {
     return ((month === 10 && day >= 1 && day <= 3) ||
         (month === 12 && day >= 10 && day <= 13));
 }
-let ScheduleBuilderService = class ScheduleBuilderService {
+function toYmd(v) {
+    return (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
+}
+let ScheduleBuilderService = ScheduleBuilderService_1 = class ScheduleBuilderService {
     adhanAdapter;
     rulesService;
     overrideService;
@@ -48,6 +56,7 @@ let ScheduleBuilderService = class ScheduleBuilderService {
     configService;
     qiyamConfigService;
     cacheManager;
+    logger = new common_1.Logger(ScheduleBuilderService_1.name);
     timezone;
     inFlight = new Map();
     constructor(adhanAdapter, rulesService, overrideService, prisma, configService, qiyamConfigService, cacheManager) {
@@ -75,10 +84,48 @@ let ScheduleBuilderService = class ScheduleBuilderService {
             periods: periods,
         };
     }
-    async buildMonth(yearMonth) {
+    async buildMonth(yearMonth, opts) {
         const tz = this.timezone;
+        const mode = opts?.rules === undefined
+            ? (0, iqama_rules_resolver_1.parseIqamaRulesMode)(this.configService.get('app.iqamaRules'))
+            : opts.rules === 'legacy'
+                ? 'legacy'
+                : 'db';
+        let ruleRows = [];
+        if (mode !== 'legacy') {
+            ruleRows = Array.isArray(opts?.rules)
+                ? opts.rules
+                : await this.prisma.iqamaRuleVersion.findMany({
+                    orderBy: { effectiveFrom: 'asc' },
+                });
+        }
+        const cutover = (0, iqama_rules_resolver_1.parseCutover)(this.configService.get('app.iqamaRulesCutover'));
+        const ruleSetCache = new Map();
+        const ruleSetFor = (date) => {
+            if (mode === 'legacy' || date < cutover)
+                return undefined;
+            try {
+                const row = (0, iqama_rules_resolver_1.resolveRuleVersion)(date, ruleRows);
+                if (!row) {
+                    throw new iqama_rules_resolver_1.IqamaRulesError('IQAMA_RULES_MISSING', `No IqamaRuleVersion covers ${date} (cutover ${cutover}). Run the seed or add a version.`);
+                }
+                let rules = ruleSetCache.get(row.id);
+                if (!rules) {
+                    rules = (0, iqama_rules_resolver_1.loadRuleSet)(row);
+                    ruleSetCache.set(row.id, rules);
+                }
+                return rules;
+            }
+            catch (e) {
+                if (!(e instanceof iqama_rules_resolver_1.IqamaRulesError))
+                    throw e;
+                this.logger.error(`[iqama rules] ${e.code}: ${e.message}`);
+                if (mode === 'db')
+                    throw e;
+                return undefined;
+            }
+        };
         const adhanConfig = await this.loadAdhanConfig();
-        const hasConfig = adhanConfig.versions.length > 0;
         const daysInMonth = dayjs_1.default.tz(`${yearMonth}-01`, tz).daysInMonth();
         const monthStart = `${yearMonth}-01`;
         const monthEnd = `${yearMonth}-${String(daysInMonth).padStart(2, '0')}`;
@@ -99,6 +146,7 @@ let ScheduleBuilderService = class ScheduleBuilderService {
                 eidByDate.set((0, dayjs_1.default)(sp.date).add(offset, 'day').format('YYYY-MM-DD'), entry);
             }
         }
+        const monthOverrides = await this.overrideService.getOverridesForRange(monthStart, monthEnd);
         const schedules = [];
         const firstDay = dayjs_1.default.tz(`${yearMonth}-01`, tz);
         const hijriYear = (0, hijri_utils_1.getHijriComponents)(firstDay).year;
@@ -114,37 +162,26 @@ let ScheduleBuilderService = class ScheduleBuilderService {
             const cached = weeklyCtxCache.get(weekFridayKey);
             if (cached)
                 return cached;
-            const ctx = this.buildWeeklyContext(date, tz);
+            const ctx = this.buildWeeklyContext(date, tz, adhanConfig);
             weeklyCtxCache.set(weekFridayKey, ctx);
             return ctx;
         };
         for (let day = 1; day <= daysInMonth; day++) {
             const date = `${yearMonth}-${String(day).padStart(2, '0')}`;
-            const dateObj = dayjs_1.default.tz(`${date}T12:00:00`, tz).toDate();
-            let raw;
-            let effectiveMethod = 'ISNA';
-            const azanCustomized = {};
-            if (hasConfig) {
-                try {
-                    const resolved = (0, adhan_config_resolver_1.resolveAdhanSettings)(date, adhanConfig.versions, adhanConfig.periods);
-                    raw = this.adhanAdapter.getPrayerTimesFromConfig(dateObj, resolved);
-                    effectiveMethod = resolved.general.method;
-                    for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
-                        azanCustomized[key] =
-                            (resolved.perPrayer[key]
-                                ?.offsetMinutes ?? 0) !== 0;
-                    }
-                }
-                catch {
-                    raw = this.adhanAdapter.getPrayerTimes(dateObj);
-                }
+            const { raw, effectiveMethod, azanCustomized } = this.resolveRawTimes(date, tz, adhanConfig);
+            const overrides = monthOverrides.filter((o) => toYmd(o.startDate) <= date && toYmd(o.endDate) >= date);
+            const weeklyCtx = getWeeklyCtx(date);
+            const ruleSet = ruleSetFor(date);
+            let iqamaTimes;
+            if (mode === 'db' && ruleSet) {
+                iqamaTimes = this.computeDbIqama(ruleSet, date, raw, weeklyCtx);
             }
             else {
-                raw = this.adhanAdapter.getPrayerTimes(dateObj);
+                iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
+                if (mode === 'shadow' && ruleSet) {
+                    this.logShadowDiff(date, iqamaTimes, this.computeDbIqama(ruleSet, date, raw, weeklyCtx));
+                }
             }
-            const overrides = await this.overrideService.getOverridesForDate(date);
-            const weeklyCtx = getWeeklyCtx(date);
-            const iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
             const rawAzanMap = {
                 fajr: raw.fajr,
                 dhuhr: raw.dhuhr,
@@ -152,7 +189,16 @@ let ScheduleBuilderService = class ScheduleBuilderService {
                 maghrib: raw.maghrib,
                 isha: raw.isha,
             };
-            const { iqamaTimes: finalIqama, hasOverrides } = this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
+            const { iqamaTimes: overridden, hasOverrides } = this.overrideService.applyOverrides(rawAzanMap, iqamaTimes, overrides);
+            const finalIqama = { ...overridden };
+            const clamped = {};
+            for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+                const g = (0, iqama_guardrail_1.applyIqamaGuardrail)(overridden[key], rawAzanMap[key], key === 'fajr' ? raw.sunrise : undefined, mode === 'db' && ruleSet?.[key].rounding?.mode === 'FLOOR');
+                finalIqama[key] = g.iqama;
+                clamped[key] = g.clamped;
+            }
+            const fajrConflict = (0, iqama_guardrail_1.toMin)(finalIqama.fajr) >
+                (0, iqama_guardrail_1.toMin)((0, time_utils_1.formatHHmm)(raw.sunrise)) - iqama_guardrail_1.FAJR_SUNRISE_BUFFER_MIN;
             const dateDayjs = dayjs_1.default.tz(date, tz);
             const hijriDate = (0, hijri_utils_1.formatHijriDate)(dateDayjs);
             const isEidDay = isAstronomicalEidDay(dateDayjs);
@@ -167,31 +213,38 @@ let ScheduleBuilderService = class ScheduleBuilderService {
                 hijri_date: hijriDate,
                 day_of_week: dateDayjs.format('dddd'),
                 is_dst: (0, dhuhr_rule_1.isDstActive)(date, tz),
+                ...(fajrConflict ? { iqama_conflict: true } : {}),
                 fajr: {
                     azan: (0, time_utils_1.formatHHmm)(raw.fajr),
                     iqama: finalIqama.fajr,
                     ...(azanCustomized['fajr'] ? { azan_customized: true } : {}),
+                    ...(clamped['fajr'] ? { iqama_clamped: true } : {}),
+                    ...(fajrConflict ? { iqama_conflict: true } : {}),
                 },
                 sunrise: (0, time_utils_1.formatHHmm)(raw.sunrise),
                 dhuhr: {
                     azan: (0, time_utils_1.formatHHmm)(raw.dhuhr),
                     iqama: finalIqama.dhuhr,
                     ...(azanCustomized['dhuhr'] ? { azan_customized: true } : {}),
+                    ...(clamped['dhuhr'] ? { iqama_clamped: true } : {}),
                 },
                 asr: {
                     azan: (0, time_utils_1.formatHHmm)(raw.asr),
                     iqama: finalIqama.asr,
                     ...(azanCustomized['asr'] ? { azan_customized: true } : {}),
+                    ...(clamped['asr'] ? { iqama_clamped: true } : {}),
                 },
                 maghrib: {
                     azan: (0, time_utils_1.formatHHmm)(raw.maghrib),
                     iqama: finalIqama.maghrib,
                     ...(azanCustomized['maghrib'] ? { azan_customized: true } : {}),
+                    ...(clamped['maghrib'] ? { iqama_clamped: true } : {}),
                 },
                 isha: {
                     azan: (0, time_utils_1.formatHHmm)(raw.isha),
                     iqama: finalIqama.isha,
                     ...(azanCustomized['isha'] ? { azan_customized: true } : {}),
+                    ...(clamped['isha'] ? { iqama_clamped: true } : {}),
                 },
                 ...(eidEntry
                     ? { eid_prayer_1: eidEntry.prayer1, eid_prayer_2: eidEntry.prayer2 }
@@ -208,22 +261,65 @@ let ScheduleBuilderService = class ScheduleBuilderService {
         }
         return schedules;
     }
-    buildWeeklyContext(date, tz) {
+    resolveRawTimes(date, tz, adhanConfig) {
+        const dateObj = dayjs_1.default.tz(`${date}T12:00:00`, tz).toDate();
+        const azanCustomized = {};
+        if (adhanConfig.versions.length > 0) {
+            try {
+                const resolved = (0, adhan_config_resolver_1.resolveAdhanSettings)(date, adhanConfig.versions, adhanConfig.periods);
+                const raw = this.adhanAdapter.getPrayerTimesFromConfig(dateObj, resolved);
+                for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+                    azanCustomized[key] =
+                        (resolved.perPrayer[key]
+                            ?.offsetMinutes ?? 0) !== 0;
+                }
+                return {
+                    raw,
+                    effectiveMethod: resolved.general.method,
+                    azanCustomized,
+                };
+            }
+            catch {
+            }
+        }
+        return {
+            raw: this.adhanAdapter.getPrayerTimes(dateObj),
+            effectiveMethod: 'ISNA',
+            azanCustomized: {},
+        };
+    }
+    buildWeeklyContext(date, tz, adhanConfig) {
         const d = dayjs_1.default.tz(date, tz);
         const dayOfWeek = d.day();
         const daysSinceFriday = (dayOfWeek + 2) % 7;
         const weekStart = d.subtract(daysSinceFriday, 'day');
         const fajrWeek = [];
         const ishaWeek = [];
+        const rawWeek = [];
         for (let i = 0; i < 7; i++) {
             const weekDate = weekStart.add(i, 'day');
             const weekDateStr = weekDate.format('YYYY-MM-DD');
-            const weekDateObj = dayjs_1.default.tz(`${weekDateStr}T12:00:00`, tz).toDate();
-            const weekRaw = this.adhanAdapter.getPrayerTimes(weekDateObj);
+            const { raw: weekRaw } = this.resolveRawTimes(weekDateStr, tz, adhanConfig);
             fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
             ishaWeek.push(weekRaw.isha);
+            rawWeek.push({ date: weekDateStr, raw: weekRaw });
         }
-        return { fajrWeek, ishaWeek };
+        return { fajrWeek, ishaWeek, rawWeek };
+    }
+    computeDbIqama(rules, date, raw, weeklyCtx) {
+        const out = {};
+        for (const p of iqama_rules_types_1.PRAYER_NAMES) {
+            const ctx = (d, r) => (0, iqama_rules_evaluator_1.toDayCtx)(d, r[p], p === 'fajr' ? r.sunrise : undefined);
+            out[p] = (0, iqama_rules_evaluator_1.evaluateRule)(rules[p], ctx(date, raw), weeklyCtx.rawWeek?.map((w) => ctx(w.date, w.raw)));
+        }
+        return out;
+    }
+    logShadowDiff(date, legacy, db) {
+        for (const p of iqama_rules_types_1.PRAYER_NAMES) {
+            if (legacy[p] !== db[p]) {
+                this.logger.warn(`[iqama shadow] ${date} ${p}: legacy=${legacy[p]} db=${db[p]}`);
+            }
+        }
     }
     async getMonth(yearMonth) {
         const cacheKey = `schedule:${yearMonth}`;
@@ -269,7 +365,7 @@ let ScheduleBuilderService = class ScheduleBuilderService {
     }
 };
 exports.ScheduleBuilderService = ScheduleBuilderService;
-exports.ScheduleBuilderService = ScheduleBuilderService = __decorate([
+exports.ScheduleBuilderService = ScheduleBuilderService = ScheduleBuilderService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(6, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
     __metadata("design:paramtypes", [adhan_adapter_1.AdhanAdapter,

@@ -2,10 +2,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { CreateOverrideDto } from './dto/create-override.dto';
 import { UpdateOverrideDto } from './dto/update-override.dto';
+import { OverrideService } from '../override/override.service';
 export declare class AdminController {
     private readonly prisma;
     private readonly scheduleBuilder;
-    constructor(prisma: PrismaService, scheduleBuilder: ScheduleBuilderService);
+    private readonly overrideService;
+    constructor(prisma: PrismaService, scheduleBuilder: ScheduleBuilderService, overrideService: OverrideService);
     createOverride(dto: CreateOverrideDto): Promise<{
         createdAt: Date;
         id: number;

@@ -14,21 +14,24 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const fajr_rule_1 = require("./fajr.rule");
 const dhuhr_rule_1 = require("./dhuhr.rule");
+const iqama_rules_resolver_1 = require("../iqama-rules/iqama-rules.resolver");
 const asr_rule_1 = require("./asr.rule");
 const maghrib_rule_1 = require("./maghrib.rule");
 const isha_rule_1 = require("./isha.rule");
 let RulesService = class RulesService {
     configService;
     timezone;
+    cutover;
     constructor(configService) {
         this.configService = configService;
         this.timezone = this.configService.get('app.masjidTimezone');
+        this.cutover = (0, iqama_rules_resolver_1.parseCutover)(this.configService.get('app.iqamaRulesCutover'));
     }
     computeIqama(date, raw, weeklyCtx) {
         const fajr = weeklyCtx
             ? (0, fajr_rule_1.computeWeeklyFajrIqama)(weeklyCtx.fajrWeek)
             : (0, fajr_rule_1.computeFajrIqama)(raw.fajr, raw.sunrise);
-        const dhuhr = (0, dhuhr_rule_1.computeDhuhrIqama)(date, this.timezone);
+        const dhuhr = (0, dhuhr_rule_1.computeDhuhrIqama)(date, this.timezone, this.cutover);
         const asr = (0, asr_rule_1.computeAsrIqama)(raw.asr);
         const maghrib = (0, maghrib_rule_1.computeMaghribIqama)(raw.maghrib);
         const isha = weeklyCtx
