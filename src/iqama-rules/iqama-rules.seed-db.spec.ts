@@ -27,13 +27,13 @@ describe('seedIqamaRules', () => {
     const c = makeClient();
     expect(await seedIqamaRules(c)).toBe(true);
     expect(c.rows).toHaveLength(1);
-    expect(c.rows[0].effectiveFrom).toBe('2026-11-13'); // the default cutover
+    expect(c.rows[0].effectiveFrom).toBe('2026-11-13'); // the default first date
     const stored = JSON.parse(c.rows[0].settings) as RuleSet;
     expect(stored).toEqual(DEFAULT_RULE_SET);
     expect(validateRuleSet(stored).errors).toEqual([]);
   });
 
-  it('uses the cutover date it is given', async () => {
+  it('uses the first date it is given', async () => {
     const c = makeClient();
     await seedIqamaRules(c, '2027-01-01');
     expect(c.rows[0].effectiveFrom).toBe('2027-01-01');

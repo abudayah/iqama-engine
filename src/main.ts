@@ -4,9 +4,13 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
 import { warnIfStaleTzdata } from './config/tzdata-guard';
+import { logIgnoredLegacyEnv } from './config/legacy-env';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // IQAMA_RULES / IQAMA_RULES_CUTOVER were removed; ignore them but say so once.
+  logIgnoredLegacyEnv();
 
   // Log loudly if this Node build has old timezone data (B.C. is UTC-7 all year).
   warnIfStaleTzdata(

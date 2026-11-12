@@ -1,11 +1,11 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: '{src/rules/**,src/adhan/**}'
+fileMatchPattern: '{src/rules/**,src/adhan/**,src/iqama-rules/iqama-rules.seed.ts}'
 ---
 
 # Prayer Time Calculation Rules — Overview
 
-> **Rule system update:** Iqama rules are moving from code to admin-editable data. The pipeline is base -> modifiers -> override -> fixed guardrails, behind the `IQAMA_RULES` flag (`legacy` | `shadow` | `db`). See `iqama-rules-system.md` for the model, the five fixed rules, the admin API and the `iqama_clamped` field. This document describes the legacy `src/rules/*.rule.ts` behaviour, which the seed rules reproduce exactly.
+> **Rule system:** Iqama times come from admin-editable rules stored in the database (pipeline: base -> modifiers -> override -> fixed guardrails). See `iqama-rules-system.md` for the model, the five fixed rules, the admin API and the `iqama_clamped` field. This document describes the behaviour of the seed rules (the old `src/rules/*.rule.ts` functions, now removed, produced exactly the same times; the snapshot test guards them).
 
 This document explains the Islamic prayer time (Iqama) calculation rules used in the iqama-engine. These rules transform raw astronomical prayer times (Azan) from the `adhan` library into congregation start times (Iqama) that are practical for the community.
 
@@ -35,15 +35,9 @@ This document explains the Islamic prayer time (Iqama) calculation rules used in
 
 Each prayer uses its own astronomical time for maximum accuracy, with Asr using simplified seasonal times for predictability.
 
-## Rule Files
+## Where the rules live
 
-Each prayer has its own rule file in `src/rules/`:
-
-- `fajr.rule.ts` — Fajr calculation (FR3) - Dynamic with override support
-- `dhuhr.rule.ts` — Dhuhr calculation (FR2) - Fixed 13:45 year-round
-- `asr.rule.ts` — Asr calculation (FR4) - Seasonal fixed times
-- `maghrib.rule.ts` — Maghrib calculation (FR1) - Simple offset
-- `isha.rule.ts` — Isha calculation (FR5) - Seasonal scaling
+Each prayer has one rule in the seed rule set (`src/iqama-rules/iqama-rules.seed.ts`, stored as `IqamaRuleVersion` version 1) and is evaluated by `src/iqama-rules/iqama-rules.evaluator.ts`. The fixed guardrails are in `src/rules/iqama-guardrail.ts`. The FR1-FR5 names below are the original requirement names.
 
 ## Rule Priority Guide
 
@@ -239,7 +233,7 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 
 - Friday iqama: `13:40` year-round (was `13:45`; the old DST/standard split was removed)
 - UI renames the Dhuhr row to "Friday" on Fridays
-- Implemented in `dhuhr.rule.ts` and `PrayerTable.tsx`
+- Implemented as a FIXED_TIME rule with a Friday adjustment of -5 (`iqama-rules.seed.ts`) and in `PrayerTable.tsx`
 
 ### Asr Rule Simplified, then Friday-anchored
 
@@ -251,7 +245,7 @@ The `src/hijri-calendar/` module handles Islamic calendar features that extend t
 Friday** of its anchor month (Sep/Oct/Nov/Jan), so the Asr Iqama only ever
 changes on a Jumu'ah. Mar 15 / Mar 14 remain fixed calendar boundaries. Times:
 6:00 PM (spring/summer), 5:00 PM (early fall), 4:30 PM (fall), 3:45 PM (winter),
-4:00 PM (late winter). Implemented in `asr.rule.ts` via `firstFridayDate()`.
+4:00 PM (late winter). Implemented as a SEASONAL rule with FIRST_FRIDAY segment starts (`iqama-rules.seed.ts`, `firstFriday()` in the evaluator).
 
 ### Fajr Rule Enhanced
 
@@ -265,7 +259,7 @@ changes on a Jumu'ah. Mar 15 / Mar 14 remain fixed calendar boundaries. Times:
 
 4. **Admin overrides (P0) are subject only to the final guardrail** — FIXED and OFFSET overrides for Fajr go through CeilingToNearest5 (P3) and then the final guardrail (Phase 0): Fajr must end ≥ 60 min before sunrise and every prayer ≥ Azan + 3 min.
 
-- Implemented in `fajr.rule.ts` (`computeFajrIqama`, `computeWeeklyFajrIqama`) and `override.service.ts` (`applyOverrides`)
+- Implemented by the Fajr rule in `iqama-rules.seed.ts` (limits, rounding, weekly lock), the evaluator (`evaluateRule`), `override.service.ts` (`applyOverrides`) and `iqama-guardrail.ts`
 
 ### Isha Rounding Changed to FloorToNearest5
 
@@ -275,7 +269,7 @@ changes on a Jumu'ah. Mar 15 / Mar 14 remain fixed calendar boundaries. Times:
 - **P0 safety net**: If flooring would leave less than 3 minutes between Azan and Iqama, the system falls back to `CeilingToNearest5`.
 - **Example**: Azan `23:16` + 5 min gap = `23:21` → floor = `23:20` (gap 4 min ✓, ≥ 3). Old behaviour: `23:25`.
 - **Winter unaffected**: In winter, Isha Azan is early (~18:00) with a 15-min gap, so floor and ceiling produce the same or very similar results.
-- Implemented in `isha.rule.ts` (`computeIshaIqama`)
+- Implemented by the Isha rule in `iqama-rules.seed.ts` (SCALED_GAP, FLOOR 5, weekly lock) and the evaluator
 
 ### High Latitude Rule Added (TwilightAngle)
 

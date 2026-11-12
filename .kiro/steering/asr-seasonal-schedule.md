@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: 'src/rules/asr.rule.ts'
+fileMatchPattern: 'src/iqama-rules/iqama-rules.seed.ts'
 ---
 
 # Asr Iqama Seasonal Schedule (Friday-anchored)
@@ -35,7 +35,7 @@ season's time continues to apply — the change waits for the Friday.
 ### "First Friday" is computed, not hardcoded
 
 Because the first Friday of Sep/Oct/Nov/Jan falls on a different calendar date
-every year, the rule computes it at runtime via `firstFridayDate(dateInMonth)`.
+every year, the evaluator computes it at runtime (`firstFriday(year, month)` in `src/iqama-rules/iqama-rules.evaluator.ts`) for `FIRST_FRIDAY` segment starts.
 This keeps the rule correct year over year with no code edits. The Mar 15 and
 Mar 14 boundaries are fixed calendar dates (not Friday-anchored).
 
@@ -106,26 +106,24 @@ temporary adjustments). Overrides (P0) take precedence over this schedule.
 
 ## Critical Rules
 
-1. **Iqama >= Azan**: enforced at the service level; if the seasonal time were
-   earlier than Azan, the system uses Azan + 5 minutes.
+1. **Iqama >= Azan + 3**: enforced by the fixed guardrail in `src/rules/iqama-guardrail.ts` (raised to the first 5-minute mark at or after Azan + 3, flagged `iqama_clamped`). With UTC-7 all year the 16:00 Late Winter time is below that from 2027-02-11 to 2027-03-14 (32 days), so those days are raised.
 2. **Return format**: `'HH:mm'` (24-hour).
-3. **Month indexing**: dayjs months are 0-indexed; the rule adds 1 for clarity.
-4. **Boundary precision**: be exact with `>=` / `<` against `firstFridayDate`.
+3. **Boundary precision**: be exact with `>=` / `<` against the first Friday of the anchor month; the evaluator compares month and day as `MMDD`.
 
 ## Example Usage
 
+The Asr rule is the SEASONAL base in `src/iqama-rules/iqama-rules.seed.ts`; `evaluateRule` returns:
+
 ```typescript
-import { computeAsrIqama } from './asr.rule';
-import dayjs from 'dayjs';
+import { DEFAULT_RULE_SET } from './iqama-rules.seed';
+import { evaluateRule } from './iqama-rules.evaluator';
 
-// May 2, 2026 - Spring/Summer
-computeAsrIqama(dayjs('2026-05-02 17:10')); // '18:00'
+const asr = (date: string) =>
+  evaluateRule(DEFAULT_RULE_SET.asr, { date, azanMin: 15 * 60 });
 
-// Sep 4, 2026 is the first Friday of September → Early Fall begins
-computeAsrIqama(dayjs('2026-09-04')); // '17:00'
-
-// Nov 20, 2026 - Winter
-computeAsrIqama(dayjs('2026-11-20 14:30')); // '15:45'
+asr('2026-05-02'); // '18:00'  Spring/Summer
+asr('2026-09-04'); // '17:00'  first Friday of September: Early Fall begins
+asr('2026-11-20'); // '15:45'  Winter
 ```
 
 ## Summary

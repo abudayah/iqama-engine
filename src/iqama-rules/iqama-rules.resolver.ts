@@ -1,24 +1,14 @@
 import { HttpException } from '@nestjs/common';
-export {
-  DEFAULT_IQAMA_RULES_CUTOVER,
-  parseCutover,
-} from './iqama-rules.cutover';
 import { validateRuleSet } from './iqama-rules.validator';
 import {
   IqamaRuleVersionRecord,
-  IqamaRulesMode,
   RuleSet,
   ValidationIssue,
 } from './iqama-rules.types';
 
-/** Anything but 'shadow' or 'db' means 'legacy'. */
-export function parseIqamaRulesMode(v: unknown): IqamaRulesMode {
-  return v === 'shadow' || v === 'db' ? v : 'legacy';
-}
-
 /**
- * Explicit failure instead of a silent fallback to legacy rules (HTTP 500).
- *  IQAMA_RULES_MISSING: no stored version covers a date on or after the cutover.
+ * Explicit failure instead of a silent fallback (HTTP 500).
+ *  IQAMA_RULES_MISSING: there is no stored rule version at all.
  *  IQAMA_RULES_INVALID: the stored JSON is unreadable or fails validation.
  */
 export class IqamaRulesError extends HttpException {
@@ -37,8 +27,9 @@ type VersionRow = Pick<
 >;
 
 /**
- * Active version for a date: greatest effectiveFrom <= date
- * (ties: higher id wins). Undefined when no version covers the date.
+ * Active version for a date: greatest effectiveFrom <= date (ties: higher id
+ * wins). A date before the first version uses the earliest version, so past
+ * dates keep working. Undefined only when there are no versions at all.
  */
 export function resolveRuleVersion<T extends VersionRow>(
   date: string,
@@ -54,7 +45,18 @@ export function resolveRuleVersion<T extends VersionRow>(
     )
       best = v;
   }
-  return best;
+  if (best) return best;
+  // Before the first version: the earliest one (lowest effectiveFrom, then id).
+  let earliest: T | undefined;
+  for (const v of versions) {
+    if (
+      !earliest ||
+      v.effectiveFrom < earliest.effectiveFrom ||
+      (v.effectiveFrom === earliest.effectiveFrom && v.id < earliest.id)
+    )
+      earliest = v;
+  }
+  return earliest;
 }
 
 /** Parse and validate a stored version (runtime validator, not a cast). */

@@ -76,34 +76,6 @@ export function ceilingToNearest5(dayjsObj: Dayjs): Dayjs {
 }
 
 /**
- * Round minutes DOWN to the nearest 5-minute boundary.
- * Used when rounding up would breach a hard ceiling (e.g. P0 safeSunriseLimit).
- */
-export function floorToNearest5(dayjsObj: Dayjs): Dayjs {
-  const base = stripSubMinute(dayjsObj);
-  const m = base.minute();
-  const remainder = m % 5;
-  if (remainder === 0) return base;
-  return base.subtract(remainder, 'minute');
-}
-
-/**
- * Round minutes up to the nearest 30-minute boundary (:00 or :30).
- * Sub-minute seconds are bumped to the next minute before rounding.
- */
-export function ceilingToNearest30(dayjsObj: Dayjs): Dayjs {
-  const base = stripSubMinute(dayjsObj);
-  const bumped =
-    dayjsObj.second() > 0 || dayjsObj.millisecond() > 0
-      ? base.add(1, 'minute')
-      : base;
-  const m = bumped.minute();
-  const remainder = m % 30;
-  if (remainder === 0) return bumped;
-  return bumped.add(30 - remainder, 'minute');
-}
-
-/**
  * Format a dayjs object to HH:mm.
  * The timezone conversion is already done before calling this function
  * (the dayjs object is already in the correct timezone from the AdhanAdapter).

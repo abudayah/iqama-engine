@@ -33,20 +33,20 @@ describe('IqamaRulesService', () => {
   afterEach(() => jest.useRealTimers());
 
   it('getConfig returns versions, effective rules and the default date', async () => {
-    const { service } = await makeStack({ mode: 'shadow' });
+    const { service } = await makeStack({});
     const cfg = await service.getConfig();
-    expect(cfg.mode).toBe('shadow');
+    expect(cfg.mode).toBe('db'); // deprecated constant
     expect(cfg.currentRevision).toBe(1);
     expect(cfg.versions).toHaveLength(1);
-    expect(cfg.cutover).toBe('2026-11-13');
-    expect(cfg.effective).toBeNull(); // before the cutover the legacy rules apply
+    // today (2026-11-11) is before version 1 (2026-11-13): the earliest version is used
+    expect(cfg.effective?.versionId).toBe(1);
     expect(cfg.latest?.rules).toEqual(DEFAULT_RULE_SET);
-    expect(cfg.upcoming).toHaveLength(1); // v1 starts on the cutover, after today
+    expect(cfg.upcoming).toHaveLength(1); // v1 starts after today
     expect(cfg.today).toBe('2026-11-11');
     expect(cfg.defaultEffectiveFrom).toBe('2026-11-13');
   });
 
-  it('getConfig returns the effective rules after the cutover, and reports bad stored rules', async () => {
+  it('getConfig returns the effective rules and reports bad stored rules', async () => {
     jest.useRealTimers();
     freezeDate('2026-11-20T20:00:00Z');
     const ok = await makeStack({});

@@ -9,14 +9,14 @@ import { AdhanAdapter } from '../adhan/adhan.adapter';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { RulesService } from '../rules/rules.service';
 import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { IqamaRulesService } from './iqama-rules.service';
 import { DEFAULT_RULE_SET } from './iqama-rules.seed';
 import { IqamaRuleVersionRecord, RuleSet } from './iqama-rules.types';
 
 export const TEST_TZ = 'Etc/GMT+7';
-export const TEST_CUTOVER = '2026-11-13';
+/** effectiveFrom of the default test version (same as the seeded version 1). */
+export const TEST_V1_DATE = '2026-11-13';
 
 export const versionRow = (
   id: number,
@@ -68,21 +68,22 @@ export function defaultAdhanConfig() {
 }
 
 export async function makeStack(opts: {
-  mode?: string;
   rows?: IqamaRuleVersionRecord[];
   /** Use the seeded Azan config (config-resolved times) instead of the legacy adapter. */
   adhanConfig?: boolean;
+  /** Masjid timezone (default: UTC-7 all year). */
+  tz?: string;
+  /** Rows returned by the override query. */
+  overrides?: unknown[];
 }) {
   const adhan = opts.adhanConfig
     ? defaultAdhanConfig()
     : { versions: [], periods: [] };
-  const rows = opts.rows ?? [versionRow(1, TEST_CUTOVER)];
+  const rows = opts.rows ?? [versionRow(1, TEST_V1_DATE)];
   const cfg: Record<string, unknown> = {
     'app.masjidLatitude': 49.2652047,
     'app.masjidLongitude': -122.7878735,
-    'app.masjidTimezone': TEST_TZ,
-    'app.iqamaRules': opts.mode,
-    'app.iqamaRulesCutover': TEST_CUTOVER,
+    'app.masjidTimezone': opts.tz ?? TEST_TZ,
   };
   const iqamaRuleVersion = {
     findMany: jest.fn(() =>
@@ -115,7 +116,7 @@ export async function makeStack(opts: {
     ),
   };
   const prisma = {
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    $queryRaw: jest.fn().mockResolvedValue(opts.overrides ?? []),
     specialPrayer: { findMany: jest.fn().mockResolvedValue([]) },
     adhanConfigVersion: {
       findMany: jest.fn().mockResolvedValue(adhan.versions),
@@ -128,7 +129,6 @@ export async function makeStack(opts: {
       ScheduleBuilderService,
       IqamaRulesService,
       AdhanAdapter,
-      RulesService,
       OverrideService,
       { provide: PrismaService, useValue: prisma },
       { provide: ConfigService, useValue: { get: (k: string) => cfg[k] } },

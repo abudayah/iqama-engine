@@ -31,7 +31,7 @@ const row = (d: DailySchedule): string =>
   ].join('|');
 
 async function buildAll(): Promise<string[]> {
-  const { builder } = await makeStack({ mode: 'db', adhanConfig: true });
+  const { builder } = await makeStack({ adhanConfig: true });
   const rows: string[] = [];
   for (let y = 2026; y <= 2035; y++) {
     for (let m = 1; m <= 12; m++) {

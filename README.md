@@ -86,7 +86,7 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 
 Each prayer uses its own astronomical time for maximum accuracy.
 
-For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md`.
+For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md` (behaviour of the seed rules) and `.kiro/steering/iqama-rules-system.md` (how the rules are stored and evaluated).
 
 ### Admin-configurable rules (iqama rule engine)
 
@@ -111,19 +111,11 @@ When a guardrail changes a time, that prayer in the schedule response has `"iqam
 
 Dhuhr is 13:45 year-round (Friday 13:40); British Columbia no longer changes clocks.
 
-**`IQAMA_RULES` environment variable**
-
-| Value              | Behaviour                                                            |
-| ------------------ | -------------------------------------------------------------------- |
-| `legacy` (default) | Hard-coded rules in `src/rules`                                      |
-| `shadow`           | Compute DB rules too, log `[iqama shadow]` differences, serve legacy |
-| `db`               | Serve the DB rules                                                   |
-
-`IQAMA_RULES_CUTOVER` (default `2026-11-13`, a Friday) is the first date served by the DB rules; earlier dates keep the legacy behaviour. In `db` mode a missing or invalid stored rule set is an explicit HTTP 500 (`IQAMA_RULES_MISSING` / `IQAMA_RULES_INVALID`), never a silent fallback. Overrides: the newest wins, and two overrides for the same prayer may not overlap (409). `iqama_conflict: true` marks Fajr days where Azan + 3 minutes beats the 60-minutes-before-sunrise rule.
+Dates before the first stored version (version 1 starts on 2026-11-13) use the earliest version, so past dates keep working; this means past winter Dhuhr dates now show 13:45 (Friday 13:40) instead of the old 12:45. A missing or invalid stored rule set is an explicit HTTP 500 (`IQAMA_RULES_MISSING` / `IQAMA_RULES_INVALID`), never a silent fallback. The old `IQAMA_RULES` and `IQAMA_RULES_CUTOVER` variables were removed and are ignored if still set. Overrides: the newest wins, and two overrides for the same prayer may not overlap (409). `iqama_conflict: true` marks Fajr days where Azan + 3 minutes beats the 60-minutes-before-sunrise rule.
 
 **Admin API** (`X-API-Key`): `GET /api/v1/admin/iqama-rules`, `GET .../catalog`, `POST .../preview`, `PUT .../base`. See `.kiro/steering/iqama-rules-system.md`.
 
-**Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, `npx ts-node scripts/report-override-overlaps.ts`, and the cutover steps in `docs/iqama-rules-cutover-runbook.md`.
+**Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, `npx ts-node scripts/report-override-overlaps.ts`, and the deploy/rollback steps in `docs/iqama-rules-cutover-runbook.md`.
 
 **Security**: responses carry `helmet` headers; public routes allow 300 requests per minute per IP and all admin routes share 120 per minute (`429` beyond). Behind a reverse proxy set `TRUST_PROXY` (prefer `loopback` or the proxy's IPs/CIDRs). See `SECURITY.md`.
 
@@ -327,12 +319,9 @@ iqama-engine/
 │   ├── health/             # Health check endpoint
 │   ├── override/           # Override management service
 │   ├── prisma/             # Database service
-│   ├── rules/              # Prayer calculation rules
-│   │   ├── fajr.rule.ts
-│   │   ├── dhuhr.rule.ts   # includes Friday block logic
-│   │   ├── asr.rule.ts
-│   │   ├── maghrib.rule.ts
-│   │   ├── isha.rule.ts
+│   ├── iqama-rules/        # Iqama rules: evaluator, validator, admin API
+│   ├── rules/              # Fixed guardrails and time helpers
+│   │   ├── iqama-guardrail.ts
 │   │   └── time-utils.ts
 │   ├── schedule/           # Schedule endpoints & service
 │   ├── app.module.ts

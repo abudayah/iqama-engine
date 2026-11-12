@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Iqama (congregation start) rules are hard-coded in `src/rules/*.rule.ts`. Two problems came up: British Columbia stopped clock changes after 2026-03-08 (UTC-7 all year), which broke the DST-based Dhuhr rule from 2027 (Dhuhr Iqama 11–46 minutes before Azan), and admin overrides had no minimum gap after Azan. This feature (1) fixes Dhuhr, (2) adds hard guardrails that hold on every path, and (3) moves the rules into versioned, admin-editable data, rolled out behind a flag with a shadow-comparison period.
+Iqama (congregation start) rules used to be hard-coded in `src/rules/*.rule.ts`. Two problems came up: British Columbia stopped clock changes after 2026-03-08 (UTC-7 all year), which broke the DST-based Dhuhr rule from 2027 (Dhuhr Iqama 11–46 minutes before Azan), and admin overrides had no minimum gap after Azan. This feature (1) fixed Dhuhr, (2) added hard guardrails that hold on every path, and (3) moved the rules into versioned, admin-editable data. It was rolled out behind a flag with a shadow-comparison period; after a clean production run the legacy code and the flag were removed (Requirement 10).
 
 This document covers the engine. The admin UI lives in the `iqama-ui` repository.
 
@@ -16,7 +16,6 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 - **Override**: A short admin exception (FIXED or OFFSET) for given dates, via the existing override API.
 - **Guardrails**: Fixed constants in code that run last on every path.
 - **Weekly lock**: Holding one Iqama for the Friday→Thursday window (latest per-day result wins).
-- **Shadow mode**: Compute both engines, log differences, serve the legacy result.
 - **`iqama_clamped`**: Boolean on a prayer entry, present when a guardrail changed the Iqama.
 
 ## Requirements
@@ -57,7 +56,7 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 2. THE rule model SHALL support the modifiers limits (min after Azan; Fajr only: Iqama at least N minutes before sunrise, i.e. latest time = sunrise − N), rounding (CEIL, FLOOR, NEAREST with a step), weekday adjust, and weekly lock.
 3. THE pipeline order SHALL be fixed: base → modifiers → override → guardrails.
 4. THE evaluator SHALL be a pure function of the rule, the day's Azan/sunrise and, for weekly lock, the Friday→Thursday window.
-5. THE seed rules SHALL reproduce the legacy rules for every day 2026–2035 (golden master).
+5. THE seed rules SHALL reproduce the former hard-coded rules for every day from 2026-11-13 (checked by a golden master while the old code existed, now by the snapshot test in Requirement 10).
 6. THE weekly lock SHALL be available for Fajr, Dhuhr, Asr and Isha, never Maghrib.
 
 ### Requirement 4: Validation
@@ -78,19 +77,16 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 3. `POST /preview` SHALL compute real days (current vs proposed, with `iqama_clamped`) and a 365-day summary (days changed, days clamped, first affected dates, per prayer), and return a preview token.
 4. `PUT /base` SHALL require the preview token and `expectedRevision`, default `effectiveFrom` to the next Friday after today, reject past dates and dates earlier than the latest version, and invalidate the schedule cache.
 5. A stale revision SHALL return 409; a missing, expired, reused or mismatched token SHALL return 422.
-6. A seed script SHALL create version 1 (effectiveFrom 1970-01-01) idempotently and run as part of `prisma db seed` and `deploy.sh`.
+6. A seed script SHALL create version 1 (effectiveFrom 2026-11-13, a Friday) idempotently when no version exists, and run as part of `prisma db seed` and `deploy.sh`.
 
-### Requirement 6: Safe rollout
+### Requirement 6: Safe behaviour
 
 #### Acceptance Criteria
 
-1. THE flag `IQAMA_RULES` SHALL accept `legacy` (default), `shadow` and `db`; any other value SHALL behave as `legacy`.
-2. IN `shadow` mode THE builder SHALL serve the legacy result and log `[iqama shadow] <date> <prayer>: legacy=… db=…` for each difference.
-3. IN `db` mode THE builder SHALL serve DB rules for dates on or after the cutover and SHALL NOT fall back silently: a date with no covering version, or stored JSON that fails the runtime validator, SHALL fail with HTTP 500 and code `IQAMA_RULES_MISSING` or `IQAMA_RULES_INVALID`, logged. IN `shadow` mode such a problem SHALL be logged and legacy served.
+3. THE builder SHALL NOT fall back silently: no stored version at all, or stored JSON that fails the runtime validator, SHALL fail with HTTP 500 and code `IQAMA_RULES_MISSING` or `IQAMA_RULES_INVALID`, logged.
 4. THE weekly context SHALL use config-resolved Azan times, and overrides SHALL be fetched once per month.
 5. A one-off script SHALL list existing overrides that the guardrails would clamp.
-6. A runbook SHALL describe the cutover and the rollback (`IQAMA_RULES=legacy`).
-7. Dates before `IQAMA_RULES_CUTOVER` (default 2026-11-13, a Friday) SHALL always use the legacy functions, including the historical Dhuhr DST logic; the Dhuhr fix applies from the cutover on. The seed SHALL create version 1 with `effectiveFrom` = the cutover.
+6. A runbook SHALL describe the deploy and the rollback.
 
 ### Requirement 8: Overrides, reason and Fajr conflicts
 
@@ -118,3 +114,13 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 #### Acceptance Criteria
 
 1. THE Asr "Late Winter 16:00" season is not redesigned. With UTC-7 it is below the 3-minute floor from 2027-02-11 to 2027-03-14 (32 days); the guardrail raises those days and flags them.
+
+### Requirement 10: Legacy removal
+
+#### Acceptance Criteria
+
+1. THE per-prayer rule functions (`src/rules/*.rule.ts`), `RulesService`, the `IQAMA_RULES` flag (legacy / shadow / db) and the `IQAMA_RULES_CUTOVER` date SHALL NOT exist; `src/rules/iqama-guardrail.ts` and `src/rules/time-utils.ts` remain.
+2. A date before the first stored version SHALL use the earliest version, so past dates keep working. Past winter Dhuhr dates therefore show 13:45 (Friday 13:40) instead of the old 12:45 (Friday 12:40).
+3. IF `IQAMA_RULES` or `IQAMA_RULES_CUTOVER` is still set, THE app SHALL ignore it and log one info line at startup.
+4. A frozen snapshot test SHALL guard the published times: the seed rules with the default Azan config for every day from 2026-11-13 to 2035-12-31 (Azan, Iqama, `iqama_clamped`, `iqama_conflict`).
+5. `GET /api/v1/admin/iqama-rules` SHALL keep a deprecated `mode` field that is always `"db"`; `cutover` is removed.

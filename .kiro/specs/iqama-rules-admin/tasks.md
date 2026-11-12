@@ -2,7 +2,7 @@
 
 ## Overview
 
-Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqama rules into versioned admin-editable data behind the `IQAMA_RULES` flag. Engine work is in this repository; Phase 3 (admin UI) is in `iqama-ui`.
+Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqama rules into versioned admin-editable data (rolled out behind a flag that has since been removed). Engine work is in this repository; Phase 3 (admin UI) is in `iqama-ui`.
 
 ## Tasks
 
@@ -65,17 +65,17 @@ Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqa
   - [x] 4d.5 `iqama_conflict` on both the Fajr entry and the day; contract documented in the steering file
   - _Requirements: 9_
 
-- [ ] 5. Production cutover (see runbook)
-  - [ ] 5.1 Check the production Node/ICU timezone data (America/Vancouver in January 2027 must be UTC-7)
-  - [ ] 5.2 Migrate and seed
-  - [ ] 5.3 Run `scripts/check-overrides-guardrail.ts` and resolve its findings
-  - [ ] 5.4 Deploy with `IQAMA_RULES=shadow`; watch `[iqama shadow]` logs for one week
-  - [ ] 5.5 Switch to `IQAMA_RULES=db`
+- [x] 5. Production cutover (see runbook)
+  - [x] 5.1 Production timezone data checked (America/Vancouver is UTC-7 in January 2027)
+  - [x] 5.2 Migrated and seeded; version 1 effective 2026-11-13
+  - [x] 5.3 Overrides checked with `scripts/check-overrides-guardrail.ts`
+  - [x] 5.4 Ran with `IQAMA_RULES=shadow`, then `IQAMA_RULES=db`; verified identical to the old rules for 140 days
 
-- [ ] 6. Phase 4B: Delete legacy code (only after a clean week of shadow in production)
-  - [ ] 6.1 Remove `src/rules/{fajr,dhuhr,asr,maghrib,isha}.rule.ts` and their specs
-  - [ ] 6.2 Remove `RulesService.computeIqama`, `IqamaTimes`/`WeeklyContext` legacy parts, and the `legacy` and `shadow` branches in `ScheduleBuilderService`
-  - [ ] 6.3 Remove `iqama-rules.golden.spec.ts` (its oracle is gone) and update tests that mock `RulesService`
-  - [ ] 6.4 Keep `rules/iqama-guardrail.ts` and `rules/time-utils.ts`; remove `getPrayerTimes` legacy adapter path only if the config fallback is no longer needed
-  - [ ] 6.5 Keep `IQAMA_RULES` handling or replace it with db-only; update README, steering and runbook
-  - _Do not start before 5.4 is clean._
+- [x] 6. Phase 4B: Delete legacy code (commits `test: replace the legacy golden master with a frozen schedule snapshot` and `refactor: remove the legacy Iqama rules`)
+  - [x] 6.1 Frozen snapshot (`src/iqama-rules/fixtures/iqama-snapshot.json`, 2026-11-13 to 2035-12-31) and `iqama-rules.snapshot.spec.ts` replace the golden master; checked equal to the legacy output on all 3336 days first
+  - [x] 6.2 Removed `src/rules/{fajr,dhuhr,asr,maghrib,isha}.rule.ts`, `rules.service.ts`, `rules.module.ts` and their specs
+  - [x] 6.3 Removed the `legacy` and `shadow` modes, the `IQAMA_RULES` flag and `IQAMA_RULES_CUTOVER` (ignored with one startup info line if still set)
+  - [x] 6.4 Kept `rules/iqama-guardrail.ts` and `rules/time-utils.ts`; moved `isDstActive` (display-only `is_dst`) to `schedule-builder/is-dst.ts`; the Azan adapter fallback (`getPrayerTimes`) stays
+  - [x] 6.5 Dates before the first version use the earliest version; no versions or invalid stored rules stay an explicit 500
+  - [x] 6.6 README, steering, AGENTS.md, `.env.example` and the runbook updated (rollback = revert the PR and run `deploy.sh`)
+  - _Requirements: 10_

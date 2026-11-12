@@ -10,12 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
 import { RULE_CATALOG } from './iqama-rules.catalog';
-import {
-  loadRuleSet,
-  parseCutover,
-  parseIqamaRulesMode,
-  resolveRuleVersion,
-} from './iqama-rules.resolver';
+import { loadRuleSet, resolveRuleVersion } from './iqama-rules.resolver';
 import { validateRuleSet } from './iqama-rules.validator';
 import { canonicalJson } from './iqama-rules.canonical';
 import { addDay, classifyDay, emptyStats } from './iqama-rules.preview-stats';
@@ -223,9 +218,6 @@ export class IqamaRulesService {
 
   async getConfig() {
     const today = this.today();
-    const cutover = parseCutover(
-      this.configService.get('app.iqamaRulesCutover'),
-    );
     const [versions, currentRevision] = await Promise.all([
       this.allVersions(),
       this.latestVersionId(),
@@ -249,9 +241,8 @@ export class IqamaRulesService {
       };
     };
 
-    // In force today. Before the cutover the legacy rules apply, so none.
-    const effectiveRow =
-      today < cutover ? undefined : resolveRuleVersion(today, versions);
+    // In force today (dates before the first version use the earliest one).
+    const effectiveRow = resolveRuleVersion(today, versions);
     // The baseline every new version must be built on (the newest one).
     const latestRow = [...versions]
       .sort(
@@ -260,8 +251,8 @@ export class IqamaRulesService {
       .at(-1);
 
     return {
-      mode: parseIqamaRulesMode(this.configService.get('app.iqamaRules')),
-      cutover,
+      // Deprecated: always 'db'. The legacy and shadow engines were removed.
+      mode: 'db' as const,
       currentRevision,
       today,
       timezone: this.timezone,
@@ -307,7 +298,7 @@ export class IqamaRulesService {
       createdBy: 'preview',
       createdAt: new Date(),
     };
-    const currentRules = versions.length > 0 ? versions : 'legacy';
+    const currentRules = versions;
     const proposedRules = [...versions, proposedRecord];
 
     const to = addDays(effectiveFrom, SCAN_DAYS - 1);
