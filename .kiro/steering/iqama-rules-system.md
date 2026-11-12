@@ -18,7 +18,7 @@ base -> modifiers -> admin override -> hard guardrails
    - `FIXED_TIME` — a clock time `HH:mm`
    - `SCALED_GAP` — gap after Azan scales linearly with Azan time between points (flat outside them)
    - `SEASONAL` — yearly segments starting on a calendar date (`DATE`) or on the first Friday of a month (`FIRST_FRIDAY`); the last segment wraps over New Year
-2. **Modifiers** (fixed order): `limits` (min after Azan; Fajr only: latest = sunrise − N) → `rounding` (CEIL/FLOOR/NEAREST, step 5/10/15/30/60) → `weekdayAdjust` (e.g. `FRI: -5`) → `weeklyLock` (hold the Friday→Thursday result; latest per-day wins; Fajr and Isha use it today).
+2. **Modifiers** (fixed order): `limits` (min after Azan; Fajr only: Iqama at least N minutes before sunrise, i.e. latest time = sunrise − N) → `rounding` (CEIL/FLOOR/NEAREST, step 5/10/15/30/60) → `weekdayAdjust` (e.g. `FRI: -5`) → `weeklyLock` (hold the Friday→Thursday result; latest per-day wins; Fajr and Isha use it today).
 3. **Override** — admin FIXED/OFFSET override (existing `OverrideService`, rounded up to 5 min). Overrides are short exceptions. **The newest override for a prayer wins** where several cover a day. Creating or updating an override whose dates overlap an active override for the SAME prayer is rejected with 409 naming the clashing override (different prayers may overlap).
 4. **Guardrails** — constants in `src/rules/iqama-guardrail.ts`. No admin setting. They run on every path including overrides. A changed time sets `iqama_clamped: true` on that prayer.
 
@@ -40,7 +40,7 @@ base -> modifiers -> admin override -> hard guardrails
 
 | Prayer  | Rule                                                                                                                   |
 | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Fajr    | OFFSET 75, min after Azan 10, latest sunrise − 60, CEIL 5, weekly lock                                                 |
+| Fajr    | OFFSET 75, min after Azan 10, ends at least 60 min before sunrise, CEIL 5, weekly lock                                 |
 | Dhuhr   | FIXED_TIME 13:45, Friday −5 (13:40). B.C. no longer changes clocks, so no DST logic (from the cutover).                |
 | Asr     | SEASONAL: Jan first Friday 16:00, Mar 15 18:00, Sep first Friday 17:00, Oct first Friday 16:30, Nov first Friday 15:45 |
 | Maghrib | OFFSET 5, CEIL 5                                                                                                       |

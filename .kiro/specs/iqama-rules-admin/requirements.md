@@ -54,7 +54,7 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 #### Acceptance Criteria
 
 1. THE rule model SHALL support the bases `OFFSET`, `FIXED_TIME`, `SCALED_GAP` (with points) and `SEASONAL` (segments starting on a calendar date or on the first Friday of a month).
-2. THE rule model SHALL support the modifiers limits (min after Azan; Fajr only: latest = sunrise − N), rounding (CEIL, FLOOR, NEAREST with a step), weekday adjust, and weekly lock.
+2. THE rule model SHALL support the modifiers limits (min after Azan; Fajr only: Iqama at least N minutes before sunrise, i.e. latest time = sunrise − N), rounding (CEIL, FLOOR, NEAREST with a step), weekday adjust, and weekly lock.
 3. THE pipeline order SHALL be fixed: base → modifiers → override → guardrails.
 4. THE evaluator SHALL be a pure function of the rule, the day's Azan/sunrise and, for weekly lock, the Friday→Thursday window.
 5. THE seed rules SHALL reproduce the legacy rules for every day 2026–2035 (golden master).

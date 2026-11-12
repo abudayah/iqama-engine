@@ -84,7 +84,7 @@ export type RuleBase =
 export interface Limits {
   /** Iqama is at least this many minutes after Azan. */
   minAfterAzan?: number;
-  /** Fajr only: Iqama is at most (sunrise - N) minutes. */
+  /** Fajr only: Iqama is at least N minutes before sunrise (latest time = sunrise - N). */
   latestBeforeSunrise?: number;
 }
 

@@ -166,7 +166,7 @@ export const RULE_CATALOG = {
         {
           ...int(
             'latestBeforeSunrise',
-            'At most this many minutes before sunrise',
+            'Iqama at least this many minutes before sunrise',
             RANGES.latestBeforeSunrise,
           ),
           required: false,
