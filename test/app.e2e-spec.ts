@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
+import { DEFAULT_RULE_SET } from './../src/iqama-rules/iqama-rules.seed';
 
 /**
  * Mock PrismaService — returns empty overrides so no DB connection is needed.
@@ -15,6 +16,18 @@ const mockPrismaService = {
   specialPrayer: { findMany: jest.fn().mockResolvedValue([]) },
   adhanConfigVersion: { findMany: jest.fn().mockResolvedValue([]) },
   adhanConfigPeriod: { findMany: jest.fn().mockResolvedValue([]) },
+  iqamaRuleVersion: {
+    findMany: jest.fn().mockResolvedValue([
+      {
+        id: 1,
+        effectiveFrom: '2026-11-13',
+        settings: JSON.stringify(DEFAULT_RULE_SET),
+        reason: null,
+        createdBy: 'test',
+        createdAt: new Date(),
+      },
+    ]),
+  },
   qiyamConfig: { findUnique: jest.fn().mockResolvedValue(null) },
   $connect: jest.fn(),
   $disconnect: jest.fn(),

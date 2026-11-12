@@ -1,6 +1,6 @@
 import { RuleSet } from './iqama-rules.types';
 
-/** Seed config reproducing the five hard-coded rules in src/rules/*.rule.ts. */
+/** Seed rules: the five rules production has run since 2026-11-13 (the former hard-coded rules). */
 export const DEFAULT_RULE_SET: RuleSet = {
   // Azan+75, at least Azan+10, ends at least 60 min before sunrise, round up to 5; held per week.
   fajr: {

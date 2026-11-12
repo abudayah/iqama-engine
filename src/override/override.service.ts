@@ -1,7 +1,7 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { Dayjs } from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { IqamaTimes } from '../rules/rules.service';
+import { IqamaTimes } from '../iqama-rules/iqama-rules.types';
 import {
   ceilingToNearest5,
   formatHHmm,

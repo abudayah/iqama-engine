@@ -137,4 +137,5 @@ export interface IqamaRuleVersionRecord {
   createdAt: Date;
 }
 
-export type IqamaRulesMode = 'legacy' | 'shadow' | 'db';
+/** Iqama time (HH:mm) per prayer for one day. */
+export type IqamaTimes = Record<PrayerName, string>;

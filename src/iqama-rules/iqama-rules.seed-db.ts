@@ -1,5 +1,7 @@
 import { DEFAULT_RULE_SET } from './iqama-rules.seed';
-import { DEFAULT_IQAMA_RULES_CUTOVER } from './iqama-rules.cutover';
+
+/** First date of seeded version 1 (a Friday). Production was seeded with this date. */
+export const SEED_EFFECTIVE_FROM = '2026-11-13';
 
 /** Minimal slice of the Prisma client used by the seed (keeps it testable). */
 export interface IqamaRuleSeedClient {
@@ -17,14 +19,14 @@ export interface IqamaRuleSeedClient {
 }
 
 /**
- * Create version 1 from DEFAULT_RULE_SET, effective from the cutover date
- * (IQAMA_RULES_CUTOVER, a Friday). Earlier dates keep the legacy rules.
+ * Create version 1 from DEFAULT_RULE_SET, effective from `effectiveFrom` (a Friday).
+ * Dates before it use this earliest version.
  * Idempotent: does nothing when any version already exists.
  * Returns true when it created the row.
  */
 export async function seedIqamaRules(
   prisma: IqamaRuleSeedClient,
-  effectiveFrom: string = DEFAULT_IQAMA_RULES_CUTOVER,
+  effectiveFrom: string = SEED_EFFECTIVE_FROM,
 ): Promise<boolean> {
   if ((await prisma.iqamaRuleVersion.count()) > 0) return false;
   await prisma.iqamaRuleVersion.create({
@@ -32,7 +34,7 @@ export async function seedIqamaRules(
       effectiveFrom,
       settings: JSON.stringify(DEFAULT_RULE_SET),
       createdBy: 'seed',
-      reason: 'Initial rules (same as the legacy rules)',
+      reason: 'Initial rules',
     },
   });
   return true;

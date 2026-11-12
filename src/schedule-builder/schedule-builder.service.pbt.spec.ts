@@ -13,10 +13,10 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import dayjs from '../dayjs';
 import { ScheduleBuilderService } from './schedule-builder.service';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
-import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
+import { versionRow } from '../iqama-rules/testing';
 
 /**
  * Generates valid HH:mm time strings (00:00–23:59).
@@ -45,16 +45,6 @@ describe('ScheduleBuilderService — Property-Based Tests', () => {
       }),
     };
 
-    const mockRulesService = {
-      computeIqama: jest.fn().mockReturnValue({
-        fajr: '04:15',
-        dhuhr: '13:15',
-        asr: '16:45',
-        maghrib: '19:35',
-        isha: '21:15',
-      }),
-    };
-
     const mockOverrideService = {
       getOverridesForRange: jest.fn().mockResolvedValue([]),
       applyOverrides: jest.fn().mockReturnValue({
@@ -80,6 +70,9 @@ describe('ScheduleBuilderService — Property-Based Tests', () => {
       adhanConfigVersion: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      iqamaRuleVersion: {
+        findMany: jest.fn().mockResolvedValue([versionRow(1, '2026-01-01')]),
+      },
       adhanConfigPeriod: {
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -102,7 +95,6 @@ describe('ScheduleBuilderService — Property-Based Tests', () => {
       providers: [
         ScheduleBuilderService,
         { provide: AdhanAdapter, useValue: mockAdhanAdapter },
-        { provide: RulesService, useValue: mockRulesService },
         { provide: OverrideService, useValue: mockOverrideService },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },

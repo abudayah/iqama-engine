@@ -5,7 +5,7 @@ fileMatchPattern: '{src/iqama-rules/**,src/schedule-builder/**,src/override/**,p
 
 # Iqama Rules System (admin-configurable rules)
 
-Iqama rules are data, not code. A rule set (one rule per prayer) is stored in the `IqamaRuleVersion` table and evaluated by a pure evaluator. The legacy `src/rules/*.rule.ts` functions still exist and are the oracle for the golden-master test until legacy is deleted (see `.kiro/specs/iqama-rules-admin/tasks.md`).
+Iqama rules are data, not code. A rule set (one rule per prayer) is stored in the `IqamaRuleVersion` table and evaluated by a pure evaluator. It is the only source of Iqama times: the old per-prayer functions (`src/rules/*.rule.ts`), the `IQAMA_RULES` flag (legacy / shadow / db) and the `IQAMA_RULES_CUTOVER` date were removed. The environment variables are ignored if still set (the app logs one info line at startup). `src/rules/` now only holds `iqama-guardrail.ts` and `time-utils.ts`.
 
 ## Pipeline (fixed order, per prayer)
 
@@ -32,16 +32,16 @@ base -> modifiers -> admin override -> hard guardrails
 
 `weeklyLock` is a computation switch; the Friday-start rule (3) applies to the four prayers whether or not their `weeklyLock` is on.
 
-## Cutover date and history
+## Dates and history
 
-`IQAMA_RULES_CUTOVER` (default `2026-11-13`, a Friday) is the first date served by the DB rules. **Dates before it always use the legacy functions**, including the old Dhuhr DST logic (13:45 in DST, 12:45 in standard time; Friday −5), so past schedules do not change. From the cutover on, Dhuhr is the fixed 13:45 (Fri 13:40). The seed creates version 1 with `effectiveFrom` = the cutover (a database seeded earlier keeps its older row; the cutover is configuration, so it still applies).
+A date uses the version with the greatest `effectiveFrom` <= that date (ties: higher id). A date before the first version uses the earliest version, so past dates keep working. Production's version 1 starts on 2026-11-13 (a Friday). Behaviour change from the removal: past winter dates now show Dhuhr 13:45 (Friday 13:40); the old DST rule showed 12:45 (Friday 12:40) before 2026-11-13.
 
-## Today's rules (seed, version 1, effectiveFrom = cutover)
+## Today's rules (seed, version 1, effectiveFrom 2026-11-13)
 
 | Prayer  | Rule                                                                                                                   |
 | ------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Fajr    | OFFSET 75, min after Azan 10, ends at least 60 min before sunrise, CEIL 5, weekly lock                                 |
-| Dhuhr   | FIXED_TIME 13:45, Friday −5 (13:40). B.C. no longer changes clocks, so no DST logic (from the cutover).                |
+| Dhuhr   | FIXED_TIME 13:45, Friday −5 (13:40). B.C. no longer changes clocks, so no DST logic.                                   |
 | Asr     | SEASONAL: Jan first Friday 16:00, Mar 15 18:00, Sep first Friday 17:00, Oct first Friday 16:30, Nov first Friday 15:45 |
 | Maghrib | OFFSET 5, CEIL 5                                                                                                       |
 | Isha    | SCALED_GAP 15 min at 20:00 → 5 min at 22:00, min after Azan 3, FLOOR 5, weekly lock                                    |
@@ -54,29 +54,23 @@ Known effect: with clocks fixed at UTC-7, the Asr 16:00 "Late Winter" segment is
 - `iqama-rules.evaluator.ts` — pure `evaluateRule`, `evaluateIqama` (rule → override → guardrail)
 - `iqama-rules.validator.ts` — `validateRuleSet(rules, effectiveFrom?, previous?)` → errors + warnings
 - `iqama-rules.catalog.ts` — `RANGES` (single source for validator and API) and `RULE_CATALOG`
-- `iqama-rules.resolver.ts` — pick the version for a date; `IQAMA_RULES` parsing
+- `iqama-rules.resolver.ts` — pick the version for a date (earliest version before the first), validate stored rules
 - `iqama-rules.seed.ts` / `iqama-rules.seed-db.ts` — default rules / idempotent DB seed
 - `iqama-rules.service.ts`, `.controller.ts`, `.module.ts`, `dto/` — admin API
-- Golden master: `iqama-rules.golden.spec.ts` (new evaluator vs legacy functions, every day 2026–2035)
+- Snapshot test: `iqama-rules.snapshot.spec.ts` against `fixtures/iqama-snapshot.json` (seed rules, default Azan config, UTC-7, every day 2026-11-13 to 2035-12-31; Azan, Iqama and the `iqama_clamped` / `iqama_conflict` flags). A diff means published times changed. Regenerate only on purpose: `UPDATE_IQAMA_SNAPSHOT=1 npx jest src/iqama-rules/iqama-rules.snapshot`.
 
-## IQAMA_RULES flag (read in `ScheduleBuilderService`)
+## Failures (no silent fallback)
 
-| Value                                 | Behaviour                                                                                                                                                                                                                                                                          |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy` (default; any unknown value) | Old `src/rules` functions. DB rules are never read.                                                                                                                                                                                                                                |
-| `shadow`                              | Computes both, logs `[iqama shadow] <date> <prayer>: legacy=… db=…`, serves legacy.                                                                                                                                                                                                |
-| `db`                                  | Serves the DB rules from the cutover. **No silent fallback:** if no version covers a date on or after the cutover, or the stored JSON is unreadable or fails the validator, the request fails with HTTP 500 and code `IQAMA_RULES_MISSING` or `IQAMA_RULES_INVALID` (also logged). |
-
-Overrides and guardrails apply in all three modes. Before the cutover every mode serves legacy. In `shadow`, a missing or invalid version is logged as an error and legacy is still served (shadow never breaks the schedule).
+If there is no stored version at all, or the stored JSON is unreadable or fails the validator, building the schedule fails with HTTP 500 and code `IQAMA_RULES_MISSING` or `IQAMA_RULES_INVALID` (also logged). Overrides and guardrails always apply.
 
 ## Admin API — `/api/v1/admin/iqama-rules` (header `X-API-Key`, same guard as adhan-config)
 
-| Method | Path       | Purpose                                                                                                                                |
-| ------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/`        | mode, cutover, current revision, `effective` (today), `latest` (the baseline), `upcoming[]`, all `versions[]`, default `effectiveFrom` |
-| GET    | `/catalog` | rule types, fields, ranges, fixed guardrails (for the UI to render forms)                                                              |
-| POST   | `/preview` | real days current vs proposed (14 sample days) + 365-day summary (days changed/clamped, first dates, per prayer); returns `previewId`  |
-| PUT    | `/base`    | save a new version. Needs `previewId` and `expectedRevision`. Default `effectiveFrom` = next Friday strictly after today               |
+| Method | Path       | Purpose                                                                                                                                                 |
+| ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/`        | mode (always `db`, deprecated), current revision, `effective` (today), `latest` (the baseline), `upcoming[]`, all `versions[]`, default `effectiveFrom` |
+| GET    | `/catalog` | rule types, fields, ranges, fixed guardrails (for the UI to render forms)                                                                               |
+| POST   | `/preview` | real days current vs proposed (14 sample days) + 365-day summary (days changed/clamped, first dates, per prayer); returns `previewId`                   |
+| PUT    | `/base`    | save a new version. Needs `previewId` and `expectedRevision`. Default `effectiveFrom` = next Friday strictly after today                                |
 
 Save rules: 400 for invalid JSON/rules, a past date, a date earlier than the latest version, or a non-Friday start for a changed Fajr/Dhuhr/Asr/Isha. 409 for a stale `expectedRevision`. 422 with a `code` for a bad preview token (`IQAMA_PREVIEW_INVALID`, `IQAMA_PREVIEW_MISMATCH`, `IQAMA_REVISION_STALE`), and 422 `IQAMA_CONFLICTS_NOT_ACKNOWLEDGED` when the preview listed Fajr conflicts and `acknowledgeConflicts: true` was not sent (the token is kept, so the admin can retry). Optional `reason` (string, max 500) is stored with the version and returned in `GET` versions. There is no `who` field: the admin password is shared. Versions are append-only. Saving invalidates the schedule cache.
 
@@ -97,8 +91,8 @@ Everything the admin UI may rely on. Dates are `YYYY-MM-DD`; times are `HH:mm`; 
 `GET /api/v1/admin/iqama-rules`
 
 ```
-{ mode: 'legacy'|'shadow'|'db', cutover, currentRevision, today, timezone, defaultEffectiveFrom,
-  effective: V | null,          // in force today; null before the cutover (legacy rules apply) or if no version
+{ mode: 'db' (deprecated constant), currentRevision, today, timezone, defaultEffectiveFrom,
+  effective: V | null,          // in force today (the earliest version if today is before the first one); null only if no version
   latest:    V | null,          // the newest version = baseline; currentRevision === latest.versionId
   upcoming:  V[],               // versions with effectiveFrom > today, oldest first
   versions:  [{ id, effectiveFrom, createdAt, createdBy, reason, settings }] }   // all, oldest first
@@ -166,7 +160,7 @@ After any 422 the UI must discard the preview and ask for a new one.
 
 ## Operations
 
-- Cutover steps: `docs/iqama-rules-cutover-runbook.md`
+- Deploy and rollback steps: `docs/iqama-rules-cutover-runbook.md`
 - Check existing overrides against the guardrail: `npx ts-node scripts/check-overrides-guardrail.ts` (read-only)
 - List overrides that overlap for the same prayer: `npx ts-node scripts/report-override-overlaps.ts` (read-only; deletes nothing; the newest override wins on shared days)
 - `npx prisma db seed` runs `prisma/seed.ts`, which seeds Adhan config and Iqama rules (both idempotent)

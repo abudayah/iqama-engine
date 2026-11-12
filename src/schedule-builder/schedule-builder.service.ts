@@ -5,12 +5,6 @@ import type { Cache } from 'cache-manager';
 import { Dayjs } from 'dayjs';
 import dayjs from '../dayjs';
 import { AdhanAdapter, RawPrayerTimes } from '../adhan/adhan.adapter';
-import {
-  IqamaTimes,
-  RulesService,
-  WeeklyContext,
-} from '../rules/rules.service';
-import { WeeklyFajrEntry } from '../rules/fajr.rule';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
@@ -18,7 +12,7 @@ import {
   getHijriComponents,
   formatHijriDate,
 } from '../hijri-calendar/hijri-utils';
-import { isDstActive } from '../rules/dhuhr.rule';
+import { isDstActive } from './is-dst';
 import { formatHHmm } from '../rules/time-utils';
 import {
   applyIqamaGuardrail,
@@ -28,13 +22,12 @@ import {
 import {
   IqamaRulesError,
   loadRuleSet,
-  parseCutover,
-  parseIqamaRulesMode,
   resolveRuleVersion,
 } from '../iqama-rules/iqama-rules.resolver';
 import { evaluateRule, toDayCtx } from '../iqama-rules/iqama-rules.evaluator';
 import {
   IqamaRuleVersionRecord,
+  IqamaTimes,
   PRAYER_NAMES,
   RuleSet,
 } from '../iqama-rules/iqama-rules.types';
@@ -79,10 +72,12 @@ function toYmd(v: Date | string): string {
   return (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
 }
 
-/** Per-call override of the IQAMA_RULES flag (used by the preview endpoint). */
+/** Raw Azan times for each day of a Friday to Thursday window. */
+type WeekWindow = { date: string; raw: RawPrayerTimes }[];
+
 export interface BuildOptions {
-  /** 'legacy' = old rule functions; an array = evaluate these DB versions. */
-  rules?: 'legacy' | IqamaRuleVersionRecord[];
+  /** Evaluate these rule versions instead of the stored ones (used by the preview endpoint). */
+  rules?: IqamaRuleVersionRecord[];
 }
 
 @Injectable()
@@ -104,7 +99,6 @@ export class ScheduleBuilderService {
 
   constructor(
     private readonly adhanAdapter: AdhanAdapter,
-    private readonly rulesService: RulesService,
     private readonly overrideService: OverrideService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -144,40 +138,25 @@ export class ScheduleBuilderService {
   ): Promise<DailySchedule[]> {
     const tz = this.timezone;
 
-    // Which rule engine: IQAMA_RULES flag, unless the caller forces one.
-    const mode =
-      opts?.rules === undefined
-        ? parseIqamaRulesMode(this.configService.get('app.iqamaRules'))
-        : opts.rules === 'legacy'
-          ? 'legacy'
-          : 'db';
-    let ruleRows: IqamaRuleVersionRecord[] = [];
-    if (mode !== 'legacy') {
-      ruleRows = Array.isArray(opts?.rules)
-        ? opts.rules
-        : await this.prisma.iqamaRuleVersion.findMany({
-            orderBy: { effectiveFrom: 'asc' },
-          });
-    }
-    // Dates before the cutover always use the legacy rules (history stays as shown).
-    const cutover = parseCutover(
-      this.configService.get('app.iqamaRulesCutover'),
-    );
+    const ruleRows: IqamaRuleVersionRecord[] =
+      opts?.rules ??
+      (await this.prisma.iqamaRuleVersion.findMany({
+        orderBy: { effectiveFrom: 'asc' },
+      }));
     const ruleSetCache = new Map<number, RuleSet>();
     /**
-     * DB rule set for a date, or undefined when legacy rules apply (legacy
-     * mode, or before the cutover). In db mode a missing or invalid version
-     * throws (HTTP 500 with a code); in shadow mode it is logged and legacy
-     * is served, so the shadow period can never break the schedule.
+     * Rule set for a date: the version with the greatest effectiveFrom <= date;
+     * dates before the first version use the earliest one. No silent fallback:
+     * no versions at all, or stored rules that fail validation, throw an
+     * IqamaRulesError (HTTP 500 with a code) and are logged.
      */
-    const ruleSetFor = (date: string): RuleSet | undefined => {
-      if (mode === 'legacy' || date < cutover) return undefined;
+    const ruleSetFor = (date: string): RuleSet => {
       try {
         const row = resolveRuleVersion(date, ruleRows);
         if (!row) {
           throw new IqamaRulesError(
             'IQAMA_RULES_MISSING',
-            `No IqamaRuleVersion covers ${date} (cutover ${cutover}). Run the seed or add a version.`,
+            `No IqamaRuleVersion exists (needed for ${date}). Run the seed or add a version.`,
           );
         }
         let rules = ruleSetCache.get(row.id);
@@ -187,10 +166,10 @@ export class ScheduleBuilderService {
         }
         return rules;
       } catch (e) {
-        if (!(e instanceof IqamaRulesError)) throw e;
-        this.logger.error(`[iqama rules] ${e.code}: ${e.message}`);
-        if (mode === 'db') throw e;
-        return undefined;
+        if (e instanceof IqamaRulesError) {
+          this.logger.error(`[iqama rules] ${e.code}: ${e.message}`);
+        }
+        throw e;
       }
     };
 
@@ -257,9 +236,9 @@ export class ScheduleBuilderService {
     // Days in the same week share the same Friday→Thursday window, so computing
     // the context 7× per week is wasteful.  Key = the ISO date of the Friday
     // that starts that week.
-    const weeklyCtxCache = new Map<string, WeeklyContext>();
+    const weeklyCtxCache = new Map<string, WeekWindow>();
 
-    const getWeeklyCtx = (date: string): WeeklyContext => {
+    const getWeeklyCtx = (date: string): WeekWindow => {
       const d = dayjs.tz(date, tz);
       const dayOfWeek = d.day(); // 0 Sun … 5 Fri … 6 Sat
       const daysSinceFriday = (dayOfWeek + 2) % 7;
@@ -294,21 +273,9 @@ export class ScheduleBuilderService {
       //     Reuse the cached result when multiple days share the same week.
       const weeklyCtx = getWeeklyCtx(date);
 
-      // (d) Compute iqama times via FR1–FR4 (weekly rules for Fajr & Isha)
+      // (d) Compute iqama times from the stored rule set (base -> modifiers).
       const ruleSet = ruleSetFor(date);
-      let iqamaTimes: IqamaTimes;
-      if (mode === 'db' && ruleSet) {
-        iqamaTimes = this.computeDbIqama(ruleSet, date, raw, weeklyCtx);
-      } else {
-        iqamaTimes = this.rulesService.computeIqama(date, raw, weeklyCtx);
-        if (mode === 'shadow' && ruleSet) {
-          this.logShadowDiff(
-            date,
-            iqamaTimes,
-            this.computeDbIqama(ruleSet, date, raw, weeklyCtx),
-          );
-        }
-      }
+      const iqamaTimes = this.computeIqama(ruleSet, date, raw, weeklyCtx);
 
       // (e) Build rawAzanMap for OFFSET override calculations
       const rawAzanMap: Record<string, Dayjs> = {
@@ -332,7 +299,7 @@ export class ScheduleBuilderService {
           overridden[key],
           rawAzanMap[key],
           key === 'fajr' ? raw.sunrise : undefined,
-          mode === 'db' && ruleSet?.[key].rounding?.mode === 'FLOOR',
+          ruleSet[key].rounding?.mode === 'FLOOR',
         );
         finalIqama[key] = g.iqama;
         clamped[key] = g.clamped;
@@ -465,7 +432,7 @@ export class ScheduleBuilderService {
   }
 
   /**
-   * Build the WeeklyContext for a given date.
+   * Build the Friday to Thursday window of raw Azan times for a given date.
    *
    * The week window runs from the most recent Friday (inclusive) through the
    * following Thursday (inclusive), i.e. 7 days.  This is the canonical
@@ -480,7 +447,7 @@ export class ScheduleBuilderService {
       versions: AdhanConfigVersionRecord[];
       periods: AdhanConfigPeriodRecord[];
     },
-  ): WeeklyContext {
+  ): WeekWindow {
     const d = dayjs.tz(date, tz);
 
     // Find the Friday that starts this week.
@@ -490,9 +457,7 @@ export class ScheduleBuilderService {
     const daysSinceFriday = (dayOfWeek + 2) % 7;
     const weekStart = d.subtract(daysSinceFriday, 'day'); // Friday
 
-    const fajrWeek: WeeklyFajrEntry[] = [];
-    const ishaWeek: Dayjs[] = [];
-    const rawWeek: { date: string; raw: RawPrayerTimes }[] = [];
+    const rawWeek: WeekWindow = [];
 
     for (let i = 0; i < 7; i++) {
       const weekDate = weekStart.add(i, 'day');
@@ -503,20 +468,18 @@ export class ScheduleBuilderService {
         tz,
         adhanConfig,
       );
-      fajrWeek.push({ fajrAzan: weekRaw.fajr, sunrise: weekRaw.sunrise });
-      ishaWeek.push(weekRaw.isha);
       rawWeek.push({ date: weekDateStr, raw: weekRaw });
     }
 
-    return { fajrWeek, ishaWeek, rawWeek };
+    return rawWeek;
   }
 
-  /** Rules from the DB rule set (base -> modifiers); overrides/guardrails come after. */
-  private computeDbIqama(
+  /** Rules from the stored rule set (base -> modifiers); overrides/guardrails come after. */
+  private computeIqama(
     rules: RuleSet,
     date: string,
     raw: RawPrayerTimes,
-    weeklyCtx: WeeklyContext,
+    week: WeekWindow,
   ): IqamaTimes {
     const out = {} as IqamaTimes;
     for (const p of PRAYER_NAMES) {
@@ -525,24 +488,10 @@ export class ScheduleBuilderService {
       out[p] = evaluateRule(
         rules[p],
         ctx(date, raw),
-        weeklyCtx.rawWeek?.map((w) => ctx(w.date, w.raw)),
+        week.map((w) => ctx(w.date, w.raw)),
       );
     }
     return out;
-  }
-
-  private logShadowDiff(
-    date: string,
-    legacy: IqamaTimes,
-    db: IqamaTimes,
-  ): void {
-    for (const p of PRAYER_NAMES) {
-      if (legacy[p] !== db[p]) {
-        this.logger.warn(
-          `[iqama shadow] ${date} ${p}: legacy=${legacy[p]} db=${db[p]}`,
-        );
-      }
-    }
   }
 
   async getMonth(yearMonth: string): Promise<DailySchedule[]> {

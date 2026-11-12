@@ -10,7 +10,7 @@ import { canonicalJson } from './iqama-rules.service';
 import { freezeDate, makeStack, versionRow } from './testing';
 import { RuleSet } from './iqama-rules.types';
 
-// Wednesday. Next Friday = 2026-11-13 (= the cutover).
+// Wednesday. Next Friday = 2026-11-13 (= seeded version 1).
 const NOW = '2026-11-11T20:00:00Z';
 const json = (r: RuleSet) => JSON.stringify(r);
 const withMaghrib = (minutes: number): RuleSet => ({
@@ -33,7 +33,7 @@ describe('GET config contract', () => {
       { ...versionRow(1, '2026-11-13'), reason: 'Initial' },
       { ...versionRow(2, '2026-12-04', asrLater), reason: 'Asr later' },
     ];
-    const { service } = await makeStack({ rows, mode: 'db' });
+    const { service } = await makeStack({ rows });
     const cfg = await service.getConfig();
 
     expect(cfg.currentRevision).toBe(2);
@@ -61,16 +61,16 @@ describe('GET config contract', () => {
     expect(cfg.currentRevision).toBe(cfg.latest?.versionId);
   });
 
-  it('has no effective rules before the cutover, even if an older row exists', async () => {
+  it('before the first version, the earliest version is the effective one', async () => {
     jest.useRealTimers();
     freezeDate(NOW);
     const { service } = await makeStack({
-      rows: [versionRow(1, '1970-01-01')],
+      rows: [versionRow(1, '2026-12-04')],
     });
     const cfg = await service.getConfig();
-    expect(cfg.effective).toBeNull();
+    expect(cfg.effective?.versionId).toBe(1);
     expect(cfg.latest?.versionId).toBe(1);
-    expect(cfg.upcoming).toEqual([]);
+    expect(cfg.upcoming.map((u) => u.versionId)).toEqual([1]);
   });
 
   it('with no versions: effective, latest are null, upcoming empty', async () => {
@@ -212,7 +212,6 @@ describe('saving on top of the newest version', () => {
 
   it('a later version that only changes Isha keeps Asr from the future version', async () => {
     const { service, builder, rows } = await makeStack({
-      mode: 'db',
       rows: [
         versionRow(1, '2026-11-13'),
         versionRow(2, '2026-12-04', asrLater),
@@ -272,7 +271,6 @@ describe('saving on top of the newest version', () => {
 
   it("building from today's version instead of the newest would revert Asr (the failure the UI must avoid)", async () => {
     const { service, builder } = await makeStack({
-      mode: 'db',
       rows: [
         versionRow(1, '2026-11-13'),
         versionRow(2, '2026-12-04', asrLater),

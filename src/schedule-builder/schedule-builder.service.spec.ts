@@ -4,25 +4,20 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import dayjs from '../dayjs';
 import { ScheduleBuilderService } from './schedule-builder.service';
 import { AdhanAdapter } from '../adhan/adhan.adapter';
-import { RulesService } from '../rules/rules.service';
 import { OverrideService } from '../override/override.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
+import { versionRow } from '../iqama-rules/testing';
 
 describe('ScheduleBuilderService', () => {
   let service: ScheduleBuilderService;
   let adhanAdapter: jest.Mocked<AdhanAdapter>;
-  let rulesService: jest.Mocked<RulesService>;
   let overrideService: jest.Mocked<OverrideService>;
   let qiyamConfigService: jest.Mocked<QiyamConfigService>;
 
   beforeEach(async () => {
     const mockAdhanAdapter = {
       getPrayerTimes: jest.fn(),
-    };
-
-    const mockRulesService = {
-      computeIqama: jest.fn(),
     };
 
     const mockOverrideService = {
@@ -41,6 +36,9 @@ describe('ScheduleBuilderService', () => {
       },
       adhanConfigVersion: {
         findMany: jest.fn().mockResolvedValue([]),
+      },
+      iqamaRuleVersion: {
+        findMany: jest.fn().mockResolvedValue([versionRow(1, '2026-01-01')]),
       },
       adhanConfigPeriod: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -64,7 +62,6 @@ describe('ScheduleBuilderService', () => {
       providers: [
         ScheduleBuilderService,
         { provide: AdhanAdapter, useValue: mockAdhanAdapter },
-        { provide: RulesService, useValue: mockRulesService },
         { provide: OverrideService, useValue: mockOverrideService },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },
@@ -75,7 +72,6 @@ describe('ScheduleBuilderService', () => {
 
     service = module.get<ScheduleBuilderService>(ScheduleBuilderService);
     adhanAdapter = module.get(AdhanAdapter);
-    rulesService = module.get(RulesService);
     overrideService = module.get(OverrideService);
     qiyamConfigService = module.get(QiyamConfigService);
   });
@@ -109,8 +105,6 @@ describe('ScheduleBuilderService', () => {
         maghrib: '21:05',
         isha: '23:00',
       };
-
-      rulesService.computeIqama.mockReturnValue(mockIqamaTimes);
 
       // Mock no overrides
       overrideService.getOverridesForRange.mockResolvedValue([]);
@@ -148,7 +142,6 @@ describe('ScheduleBuilderService', () => {
       // once per day + 7 times per unique week. June 2026 has 5 distinct weeks.
       // 5 weeks × 7 days + 30 per-day calls = 65 total.
       expect(adhanAdapter.getPrayerTimes).toHaveBeenCalledTimes(65);
-      expect(rulesService.computeIqama).toHaveBeenCalledTimes(30);
       expect(overrideService.getOverridesForRange).toHaveBeenCalledTimes(1);
     });
 
@@ -169,7 +162,6 @@ describe('ScheduleBuilderService', () => {
         maghrib: '21:05',
         isha: '23:00',
       };
-      rulesService.computeIqama.mockReturnValue(iqama);
       overrideService.getOverridesForRange.mockResolvedValue([]);
       overrideService.applyOverrides.mockReturnValue({
         iqamaTimes: iqama,
@@ -194,14 +186,6 @@ describe('ScheduleBuilderService', () => {
         asr: dayjs.tz('2026-01-01 14:30', 'America/Vancouver'),
         maghrib: dayjs.tz('2026-01-01 16:30', 'America/Vancouver'),
         isha: dayjs.tz('2026-01-01 18:30', 'America/Vancouver'),
-      });
-
-      rulesService.computeIqama.mockReturnValue({
-        fajr: '06:15',
-        dhuhr: '12:45',
-        asr: '16:00',
-        maghrib: '16:35',
-        isha: '18:45',
       });
 
       overrideService.getOverridesForRange.mockResolvedValue([]);
@@ -235,14 +219,6 @@ describe('ScheduleBuilderService', () => {
         isha: dayjs.tz('2026-02-01 19:00', 'America/Vancouver'),
       });
 
-      rulesService.computeIqama.mockReturnValue({
-        fajr: '06:15',
-        dhuhr: '12:45',
-        asr: '16:00',
-        maghrib: '17:35',
-        isha: '19:15',
-      });
-
       overrideService.getOverridesForRange.mockResolvedValue([]);
       overrideService.applyOverrides.mockReturnValue({
         iqamaTimes: {
@@ -272,14 +248,6 @@ describe('ScheduleBuilderService', () => {
         asr: dayjs.tz('2026-06-01 17:30', 'America/Vancouver'),
         maghrib: dayjs.tz('2026-06-01 21:00', 'America/Vancouver'),
         isha: dayjs.tz('2026-06-01 22:45', 'America/Vancouver'),
-      });
-
-      rulesService.computeIqama.mockReturnValue({
-        fajr: '04:15',
-        dhuhr: '13:45',
-        asr: '18:00',
-        maghrib: '21:05',
-        isha: '23:00',
       });
 
       // Mock override for Fajr
@@ -326,14 +294,6 @@ describe('ScheduleBuilderService', () => {
         isha: dayjs.tz('2026-06-01 22:45', 'America/Vancouver'),
       });
 
-      rulesService.computeIqama.mockReturnValue({
-        fajr: '04:15',
-        dhuhr: '13:45',
-        asr: '18:00',
-        maghrib: '21:05',
-        isha: '23:00',
-      });
-
       overrideService.getOverridesForRange.mockResolvedValue([]);
       overrideService.applyOverrides.mockReturnValue({
         iqamaTimes: {
@@ -363,14 +323,6 @@ describe('ScheduleBuilderService', () => {
         asr: dayjs.tz('2026-06-01 17:30', 'America/Vancouver'),
         maghrib: dayjs.tz('2026-06-01 21:00', 'America/Vancouver'),
         isha: dayjs.tz('2026-06-01 22:45', 'America/Vancouver'),
-      });
-
-      rulesService.computeIqama.mockReturnValue({
-        fajr: '04:15',
-        dhuhr: '13:45',
-        asr: '18:00',
-        maghrib: '21:05',
-        isha: '23:00',
       });
 
       overrideService.getOverridesForRange.mockResolvedValue([]);
@@ -405,13 +357,6 @@ describe('ScheduleBuilderService', () => {
       asr: dayjs.tz(`${yearMonth}-01 16:30`, tz),
       maghrib: dayjs.tz(`${yearMonth}-01 19:30`, tz),
       isha: dayjs.tz(`${yearMonth}-01 21:00`, tz),
-    });
-    rulesService.computeIqama.mockReturnValue({
-      fajr: '04:15',
-      dhuhr: '13:15',
-      asr: '16:45',
-      maghrib: '19:35',
-      isha: '21:15',
     });
     overrideService.getOverridesForRange.mockResolvedValue([]);
     overrideService.applyOverrides.mockReturnValue({

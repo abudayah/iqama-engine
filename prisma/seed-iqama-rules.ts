@@ -1,9 +1,9 @@
 /**
  * seed-iqama-rules.ts
  *
- * Seeds IqamaRuleVersion #1 (effectiveFrom = IQAMA_RULES_CUTOVER, default
- * 2026-11-13, a Friday) with the rules that
- * reproduce today's hard-coded iqama behaviour. Idempotent.
+ * Seeds IqamaRuleVersion #1 (effectiveFrom 2026-11-13, a Friday) with the
+ * default rules. Idempotent: does nothing when any version exists.
+ * (The old IQAMA_RULES_CUTOVER variable is ignored.)
  *
  * Run: npx ts-node prisma/seed-iqama-rules.ts
  * (also chained from `npx prisma db seed`, see prisma.config.ts)
@@ -12,14 +12,13 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { seedIqamaRules } from '../src/iqama-rules/iqama-rules.seed-db';
-import { parseCutover } from '../src/iqama-rules/iqama-rules.cutover';
 
 const DATABASE_URL = process.env['DATABASE_URL'] ?? 'file:./prisma/db.sqlite';
 
 const adapter = new PrismaLibSql({ url: DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-seedIqamaRules(prisma, parseCutover(process.env['IQAMA_RULES_CUTOVER']))
+seedIqamaRules(prisma)
   .then((created) =>
     console.log(
       created

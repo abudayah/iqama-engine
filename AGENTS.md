@@ -50,17 +50,15 @@ npm run build && npm run start:prod   # production-style (TZ=UTC node dist/src/m
 
 Environment variables (see `.env.example`):
 
-| Variable                              | Purpose                                                                           |
-| ------------------------------------- | --------------------------------------------------------------------------------- |
-| `MASJID_LATITUDE`, `MASJID_LONGITUDE` | Coordinates for the Azan calculation (defaults: Port Coquitlam)                   |
-| `MASJID_TIMEZONE`                     | IANA timezone, default `America/Vancouver`                                        |
-| `DATABASE_URL`                        | SQLite URL, e.g. `file:./prisma/db.sqlite` (required, app fails fast)             |
-| `ADMIN_PASSWORD`                      | Shared admin key for `/api/v1/admin/*` and some Hijri endpoints                   |
-| `CORS_ORIGIN`                         | Comma-separated allowed origins, `*` for any; empty disables CORS                 |
-| `PORT`                                | HTTP port (default 3000)                                                          |
-| `IQAMA_RULES`                         | `legacy` (default), `shadow` or `db`: which Iqama rule engine serves the schedule |
-| `IQAMA_RULES_CUTOVER`                 | First date (a Friday) served by the DB rules; default `2026-11-13`                |
-| `TRUST_PROXY`                         | `loopback`, proxy IPs/CIDRs (or hop count, less safe); default off                |
+| Variable                              | Purpose                                                               |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| `MASJID_LATITUDE`, `MASJID_LONGITUDE` | Coordinates for the Azan calculation (defaults: Port Coquitlam)       |
+| `MASJID_TIMEZONE`                     | IANA timezone, default `America/Vancouver`                            |
+| `DATABASE_URL`                        | SQLite URL, e.g. `file:./prisma/db.sqlite` (required, app fails fast) |
+| `ADMIN_PASSWORD`                      | Shared admin key for `/api/v1/admin/*` and some Hijri endpoints       |
+| `CORS_ORIGIN`                         | Comma-separated allowed origins, `*` for any; empty disables CORS     |
+| `PORT`                                | HTTP port (default 3000)                                              |
+| `TRUST_PROXY`                         | `loopback`, proxy IPs/CIDRs (or hop count, less safe); default off    |
 
 Quick check after starting: `GET /api/v1/health`, then `GET /api/v1/schedule?date=YYYY-MM-DD`.
 
@@ -77,7 +75,7 @@ src/
   hijri-calendar/    moon-sighting override, Eid prayers, Qiyam time, Hijri utils
   override/          OverrideService: query + apply overrides
   prisma/            PrismaService (libSQL adapter)
-  rules/             one file per prayer (fajr/dhuhr/asr/maghrib/isha .rule.ts), rules.service, time-utils
+  rules/             iqama-guardrail.ts (fixed guardrails) and time-utils
   iqama-rules/       admin-editable Iqama rules: evaluator, validator, catalog, versions API (/api/v1/admin/iqama-rules)
   schedule/          public schedule endpoint
   throttle/          rate-limit configuration (@nestjs/throttler)
@@ -85,7 +83,7 @@ src/
   dayjs.ts           dayjs setup (plugins); import dayjs from here, not from 'dayjs'
 prisma/              schema.prisma, migrations/, seed.ts (runs seed-adhan-config.ts and seed-iqama-rules.ts)
 scripts/             one-off read-only checks (override guardrail, override overlaps)
-docs/                operations runbook (Iqama rules cutover)
+docs/                operations runbook (Iqama rules deploy and rollback)
 test/                e2e test
 .kiro/steering/      domain rules for AI agents (read these first, see below)
 .kiro/specs/         requirements.md / design.md / tasks.md per feature
@@ -103,9 +101,9 @@ deploy.sh, .cpanel.yml, .github/workflows/   deployment
 
 ## Domain invariants a reviewer must check
 
-1. **Timezone.** The masjid timezone is `America/Vancouver`. British Columbia stopped clock changes after 2026-03-08, so local time is UTC-7 all year from then on. Code must not infer "winter" or "summer" clock offsets from DST. From the cutover date (`IQAMA_RULES_CUTOVER`, default 2026-11-13) Dhuhr is fixed (13:45, Friday 13:40) with no DST logic. `src/rules/dhuhr.rule.ts` keeps the old DST logic only for dates before the cutover, so past schedules do not change. Do not add new DST-based rules. Tests and `npm run start:prod` run with `TZ=UTC`, so any code that depends on the process timezone is a bug: always pass the masjid timezone explicitly.
+1. **Timezone.** The masjid timezone is `America/Vancouver`. British Columbia stopped clock changes after 2026-03-08, so local time is UTC-7 all year from then on. Code must not infer "winter" or "summer" clock offsets from DST. Dhuhr is a fixed 13:45 (Friday 13:40) in the stored rules, with no DST logic; past winter dates now show 13:45 too (the old DST rule was removed). `is_dst` in the schedule is a display-only field (`src/schedule-builder/is-dst.ts`). Do not add DST-based rules. Tests and `npm run start:prod` run with `TZ=UTC`, so any code that depends on the process timezone is a bug: always pass the masjid timezone explicitly.
 2. **Iqama must never be earlier than the Azan.** This is the critical invariant (`.kiro/steering/prayer-rules-overview.md`).
-3. **Weekly window.** Fajr and Isha Iqama are held for a Friday to Thursday window: the schedule builder computes the 7 days of that window and the rule takes the latest per-day result (Fajr is also capped by the earliest `sunrise - 60 min` of the window). Changes to Fajr/Isha must keep this window and the per-week context (`getWeeklyCtx` / `buildWeeklyContext`) consistent.
+3. **Weekly window.** Fajr and Isha Iqama are held for a Friday to Thursday window: the schedule builder computes the 7 days of that window and the rule takes the latest per-day result (Fajr is also capped by the earliest `sunrise - 60 min` of the window). Changes to Fajr/Isha must keep this window and the per-week window (`getWeeklyCtx` / `buildWeeklyContext`) consistent.
 4. **Overrides.** Admin overrides (FIXED `HH:mm` or OFFSET minutes) replace the rule result for a prayer on a date range and are rounded up to 5 minutes. They are applied by `OverrideService.applyOverrides`. Fixed guardrails run after overrides on every path (Iqama at least Azan + 3 minutes, Fajr at least 60 minutes before sunrise, every time on a 5-minute mark); a changed time carries `iqama_clamped: true`. The newest override wins when several cover a day, and creating or updating an override that overlaps another for the same prayer returns 409. When reviewing override code, check how date strings are compared (SQLite stores dates as `YYYY-MM-DDTHH:mm:ss…`, so queries compare the `YYYY-MM-DD` prefix with raw SQL).
 5. **Caching and invalidation.** `ScheduleBuilderService.getMonth` caches one month per key (`schedule:YYYY-MM`) in memory (TTL 10 minutes, max 100 entries, see `src/app.module.ts`) and shares in-flight builds. Anything that changes the schedule (overrides, Azan config versions and periods, moon-sighting overrides, Qiyam config) must call `invalidateCache(...)` for the affected dates. Check that a new write path does this.
 6. **Admin auth.** `ApiKeyGuard` (`src/auth/api-key.guard.ts`) reads the `x-api-key` header and compares it with `ADMIN_PASSWORD` (SHA-256 hashes, `timingSafeEqual`). If `ADMIN_PASSWORD` is not set the guard rejects every request (401). Every new write endpoint needs `@UseGuards(ApiKeyGuard)`; routes with that guard are automatically covered by the stricter admin rate limit (120 requests per minute per IP, shared across all admin routes; public routes allow 300 per minute) in `src/throttle/throttle.config.ts`. HTTP setup (helmet, CORS, `trust proxy`, validation) lives in `src/app.setup.ts`. Behind a reverse proxy set `TRUST_PROXY` to `loopback` (proxy on the same host) or the proxy's IPs/CIDRs, otherwise all clients share the proxy's IP and one rate limit. Hop counts and `true` are accepted but only safe when the app port is reachable solely through the proxy (a client could otherwise spoof `X-Forwarded-For`); the app logs a startup warning for them ([Express: behind proxies](https://expressjs.com/en/guide/behind-proxies.html)). Public endpoints today: `GET /api/v1/schedule`, `GET /api/v1/health` (generic `503` body on failure, details only in the server log), and the read endpoints of `/api/v1/hijri-calendar` (status, eid-prayers, qiyam-config).
@@ -114,7 +112,7 @@ deploy.sh, .cpanel.yml, .github/workflows/   deployment
 
 ## Iqama rules system
 
-Iqama rules can be stored in the database (`IqamaRuleVersion`, append-only) and edited through `/api/v1/admin/iqama-rules` (merged in [PR #3](https://github.com/abudayah/iqama-engine/pull/3)). The pipeline is base, modifiers, override, then fixed guardrails. The rollout flag `IQAMA_RULES=legacy|shadow|db` (default `legacy`) and the cutover date `IQAMA_RULES_CUTOVER` decide what serves the schedule; the full model, API contract and rules are in `.kiro/steering/iqama-rules-system.md`, and the cutover steps are in `docs/iqama-rules-cutover-runbook.md`. Until the legacy code is removed, `src/rules/*.rule.ts` (described in `.kiro/steering/prayer-rules-overview.md`) is still the oracle for the golden-master test and serves `legacy` mode. The `/api/v1/admin/iqama-rules` routes use `ApiKeyGuard`, so they share the admin rate limit.
+Iqama rules can be stored in the database (`IqamaRuleVersion`, append-only) and edited through `/api/v1/admin/iqama-rules` (merged in [PR #3](https://github.com/abudayah/iqama-engine/pull/3)). The pipeline is base, modifiers, override, then fixed guardrails. The stored rules are the only source of Iqama times: the old per-prayer functions and the `IQAMA_RULES` / `IQAMA_RULES_CUTOVER` settings were removed (the variables are ignored if still set). A date before the first version uses the earliest version; no versions or invalid stored rules fail with an explicit 500. The full model and API contract are in `.kiro/steering/iqama-rules-system.md`; deploy and rollback steps are in `docs/iqama-rules-cutover-runbook.md`. `.kiro/steering/prayer-rules-overview.md` describes the behaviour of the seed rules. A frozen snapshot of the schedule (`src/iqama-rules/fixtures/iqama-snapshot.json`, checked by `iqama-rules.snapshot.spec.ts`) guards the published times. The `/api/v1/admin/iqama-rules` routes use `ApiKeyGuard`, so they share the admin rate limit.
 
 ## Pull requests and commits
 
@@ -127,11 +125,11 @@ Iqama rules can be stored in the database (`IqamaRuleVersion`, append-only) and 
 ## How to review (checklist)
 
 1. **Times are correct.** For rule changes, pick concrete dates (a normal day, a Friday, the first Friday of a month, 2027-01-01, a June day with a very late Isha, a day around sunrise for Fajr) and work out the expected Azan and Iqama by hand. Check rounding direction (up or down, 5-minute marks) and that Iqama is never before the Azan.
-2. **Tests exist and are meaningful.** New logic has a unit test, and an invariant has a `fast-check` property where it makes sense. Existing tests were not weakened or deleted to make the change pass. If a PR adds or touches rule code, check whether the PR also keeps any "golden master" test that compares old and new rule outputs (`src/iqama-rules/iqama-rules.golden.spec.ts`) green.
+2. **Tests exist and are meaningful.** New logic has a unit test, and an invariant has a `fast-check` property where it makes sense. Existing tests were not weakened or deleted to make the change pass. If a PR changes rules or Azan inputs, check the snapshot test (`src/iqama-rules/iqama-rules.snapshot.spec.ts`): a diff means published times changed, and regenerating the fixture (`UPDATE_IQAMA_SNAPSHOT=1`) must be intended and reviewed.
 3. **Run it.** `npm run build`, `npm run lint` and `npm run test` pass. Note that `npm run lint` rewrites files with `--fix`, so check `git status` afterwards.
 4. **Migrations are additive.** New Prisma migrations only add tables or nullable columns; no drops, renames, or data loss without an explicit plan. `schema.prisma` and the SQL migration agree.
 5. **No secrets.** No `.env`, passwords, keys, tokens or database files in the diff. New configuration is documented in `.env.example`.
 6. **Auth and validation.** New write endpoints are guarded with `ApiKeyGuard` and validate input with DTOs.
 7. **Cache.** Anything that changes the schedule invalidates the affected months.
-8. **No silent fallbacks.** Code must not hide a failure by quietly using another source (a default time, legacy rules, an empty list). If data is missing or invalid, it should fail with a clear error or log a visible warning, and a test should cover it.
+8. **No silent fallbacks.** Code must not hide a failure by quietly using another source (a default time, another rule set, an empty list). If data is missing or invalid, it should fail with a clear error or log a visible warning, and a test should cover it.
 9. **Docs match the code.** If a rule, endpoint or env variable changed, `README.md`, `.kiro/steering/` and the relevant `.kiro/specs/` file are updated.

@@ -1,20 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AdhanModule } from '../adhan/adhan.module';
-import { RulesModule } from '../rules/rules.module';
 import { OverrideModule } from '../override/override.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
 import { ScheduleBuilderService } from './schedule-builder.service';
 
 @Module({
-  imports: [
-    ConfigModule,
-    AdhanModule,
-    RulesModule,
-    OverrideModule,
-    PrismaModule,
-  ],
+  imports: [ConfigModule, AdhanModule, OverrideModule, PrismaModule],
   providers: [ScheduleBuilderService, QiyamConfigService],
   exports: [ScheduleBuilderService],
 })

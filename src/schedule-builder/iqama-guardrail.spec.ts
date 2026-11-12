@@ -1,35 +1,16 @@
 /**
- * Phase 0 guardrail: real adhan adapter + real rules + real override service,
+ * Guardrails: real adhan adapter + stored rules + real override service,
  * only Prisma/cache are faked. Checks the final DailySchedule, not the rules.
  */
-import { Test } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as fc from 'fast-check';
 import dayjs from '../dayjs';
-import { ScheduleBuilderService } from './schedule-builder.service';
-import { AdhanAdapter } from '../adhan/adhan.adapter';
-import { RulesService } from '../rules/rules.service';
-import { OverrideService } from '../override/override.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { QiyamConfigService } from '../hijri-calendar/qiyam-config.service';
 import { DailySchedule } from '../schedule/daily-schedule.interface';
+import { makeStack } from '../iqama-rules/testing';
 
 const PRAYERS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
 const mins = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
 
-const baseSettings = {
-  general: {
-    method: 'NorthAmerica',
-    madhab: 'shafi',
-    highLatitudeRule: 'TwilightAngle',
-    polarCircleResolution: 'Unresolved',
-    rounding: 'Nearest',
-  },
-  prayers: {},
-};
-
-// America/Vancouver in the bundled tzdata may still switch to PST in winter;
+// America/Vancouver in an old tzdata may still switch to PST in winter;
 // Etc/GMT+7 is the real post-2026 behaviour (UTC-7 all year).
 const FIXED_TZ = 'Etc/GMT+7';
 
@@ -38,47 +19,12 @@ async function makeService(opts: {
   tz?: string;
   overrides?: unknown[];
 }) {
-  const cfg: Record<string, unknown> = {
-    'app.masjidLatitude': 49.2652047,
-    'app.masjidLongitude': -122.7878735,
-    'app.masjidTimezone': opts.tz ?? FIXED_TZ,
-  };
-  const prisma = {
-    $queryRaw: jest.fn().mockResolvedValue(opts.overrides ?? []),
-    specialPrayer: { findMany: jest.fn().mockResolvedValue([]) },
-    adhanConfigVersion: {
-      findMany: jest.fn().mockResolvedValue(
-        opts.withConfig
-          ? [
-              {
-                id: 1,
-                effectiveFrom: '1970-01-01',
-                settings: JSON.stringify(baseSettings),
-                createdBy: 'test',
-                createdAt: new Date(),
-              },
-            ]
-          : [],
-      ),
-    },
-    adhanConfigPeriod: { findMany: jest.fn().mockResolvedValue([]) },
-  };
-  const module = await Test.createTestingModule({
-    providers: [
-      ScheduleBuilderService,
-      AdhanAdapter,
-      RulesService,
-      OverrideService,
-      { provide: PrismaService, useValue: prisma },
-      { provide: ConfigService, useValue: { get: (k: string) => cfg[k] } },
-      {
-        provide: QiyamConfigService,
-        useValue: { getForYear: jest.fn().mockResolvedValue(null) },
-      },
-      { provide: CACHE_MANAGER, useValue: {} },
-    ],
-  }).compile();
-  return { service: module.get(ScheduleBuilderService), prisma };
+  const { builder, prisma } = await makeStack({
+    adhanConfig: opts.withConfig,
+    tz: opts.tz,
+    overrides: opts.overrides,
+  });
+  return { service: builder, prisma };
 }
 
 describe('iqama guardrail (final schedule)', () => {
