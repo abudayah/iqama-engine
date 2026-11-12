@@ -31,10 +31,51 @@ export const versionRow = (
   createdAt: new Date(),
 });
 
+/** The Azan settings the app is seeded with (prisma/seed-adhan-config.ts), plus the
+ * summer Isha -6 minute period for every year the tests look at. */
+export function defaultAdhanConfig() {
+  const settings = JSON.stringify({
+    general: {
+      method: 'NorthAmerica',
+      madhab: 'shafi',
+      highLatitudeRule: 'TwilightAngle',
+      polarCircleResolution: 'Unresolved',
+      rounding: 'Nearest',
+    },
+    prayers: {},
+  });
+  const versions = [
+    {
+      id: 1,
+      effectiveFrom: '1970-01-01',
+      settings,
+      createdBy: 'test',
+      createdAt: new Date(),
+    },
+  ];
+  const periods = Array.from({ length: 12 }, (_, i) => ({
+    id: i + 1,
+    label: `Summer Isha Adjustment ${2026 + i}`,
+    startDate: `${2026 + i}-05-01`,
+    endDate: `${2026 + i}-07-31`,
+    settings: JSON.stringify({ prayers: { isha: { offsetMinutes: -6 } } }),
+    createdBy: 'test',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+  }));
+  return { versions, periods };
+}
+
 export async function makeStack(opts: {
   mode?: string;
   rows?: IqamaRuleVersionRecord[];
+  /** Use the seeded Azan config (config-resolved times) instead of the legacy adapter. */
+  adhanConfig?: boolean;
 }) {
+  const adhan = opts.adhanConfig
+    ? defaultAdhanConfig()
+    : { versions: [], periods: [] };
   const rows = opts.rows ?? [versionRow(1, TEST_CUTOVER)];
   const cfg: Record<string, unknown> = {
     'app.masjidLatitude': 49.2652047,
@@ -76,8 +117,10 @@ export async function makeStack(opts: {
   const prisma = {
     $queryRaw: jest.fn().mockResolvedValue([]),
     specialPrayer: { findMany: jest.fn().mockResolvedValue([]) },
-    adhanConfigVersion: { findMany: jest.fn().mockResolvedValue([]) },
-    adhanConfigPeriod: { findMany: jest.fn().mockResolvedValue([]) },
+    adhanConfigVersion: {
+      findMany: jest.fn().mockResolvedValue(adhan.versions),
+    },
+    adhanConfigPeriod: { findMany: jest.fn().mockResolvedValue(adhan.periods) },
     iqamaRuleVersion,
   };
   const module = await Test.createTestingModule({
