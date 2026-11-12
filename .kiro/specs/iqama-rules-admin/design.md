@@ -58,7 +58,7 @@ Azan + sunrise (config-resolved)
 
 `GET /catalog` → base types with fields and ranges, modifiers, pipeline, prayers (`weeklyLockAllowed`, `fridayStartRequired`, `sunriseLimitAllowed`), guardrails.
 
-`POST /preview` `{ settings: string, effectiveFrom? }` → `{ previewId, currentRevision, effectiveFrom, warnings, days[14], summary }` where `summary = { from, to, totalDays, daysChanged, daysClamped, daysClampedCurrent, firstChangedDates, firstClampedDates, byPrayer }`.
+`POST /preview` `{ settings: string, effectiveFrom? }` → `{ previewId, currentRevision, effectiveFrom, warnings, days[14], summary }` where `summary = { from, to, totalDays, daysChanged, daysClamped, daysClampedCurrent, firstChangedDates, firstClampedDates, changedDays, movedNow, movedProposed, newlyMoved, newlyMovedDates, noLongerMoved, byPrayer }`; `byPrayer[p]` also carries the same moved counts (see the steering UI contract).
 
 `PUT /base` `{ settings: string, effectiveFrom?, previewId, expectedRevision, reason?, acknowledgeConflicts?, requestHash? }` → the created version.
 
