@@ -265,6 +265,24 @@ export declare class IqamaRulesController {
             prayers: Record<string, unknown>;
         }[];
         summary: {
+            byPrayer: {
+                [k: string]: {
+                    changedDays: number;
+                    movedNow: number;
+                    movedProposed: number;
+                    newlyMoved: number;
+                    newlyMovedDates: string[];
+                    noLongerMoved: number;
+                    daysChanged: number;
+                    daysClamped: number;
+                };
+            };
+            changedDays: number;
+            movedNow: number;
+            movedProposed: number;
+            newlyMoved: number;
+            newlyMovedDates: string[];
+            noLongerMoved: number;
             from: string;
             to: string;
             totalDays: number;
@@ -274,12 +292,6 @@ export declare class IqamaRulesController {
             conflictDays: number;
             firstChangedDates: string[];
             firstClampedDates: string[];
-            byPrayer: {
-                [k: string]: {
-                    daysChanged: number;
-                    daysClamped: number;
-                };
-            };
         };
     }>;
     createVersion(dto: CreateIqamaRulesVersionDto): Promise<{

@@ -9,8 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IqamaRulesService = void 0;
-exports.canonicalJson = canonicalJson;
+exports.IqamaRulesService = exports.canonicalJson = void 0;
 exports.nextFriday = nextFriday;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
@@ -20,6 +19,9 @@ const schedule_builder_service_1 = require("../schedule-builder/schedule-builder
 const iqama_rules_catalog_1 = require("./iqama-rules.catalog");
 const iqama_rules_resolver_1 = require("./iqama-rules.resolver");
 const iqama_rules_validator_1 = require("./iqama-rules.validator");
+const iqama_rules_canonical_1 = require("./iqama-rules.canonical");
+Object.defineProperty(exports, "canonicalJson", { enumerable: true, get: function () { return iqama_rules_canonical_1.canonicalJson; } });
+const iqama_rules_preview_stats_1 = require("./iqama-rules.preview-stats");
 const iqama_rules_types_1 = require("./iqama-rules.types");
 const PREVIEW_TTL_MS = 10 * 60 * 1000;
 const SAMPLE_DAYS = 14;
@@ -31,19 +33,6 @@ const addDays = (date, n) => {
     d.setUTCDate(d.getUTCDate() + n);
     return d.toISOString().slice(0, 10);
 };
-function canonicalJson(value) {
-    if (Array.isArray(value))
-        return `[${value.map(canonicalJson).join(',')}]`;
-    if (value && typeof value === 'object') {
-        const o = value;
-        return `{${Object.keys(o)
-            .filter((k) => o[k] !== undefined)
-            .sort()
-            .map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
-            .join(',')}}`;
-    }
-    return JSON.stringify(value);
-}
 function nextFriday(today) {
     const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
     return addDays(today, (5 - dow + 7) % 7 || 7);
@@ -78,7 +67,7 @@ let IqamaRulesService = class IqamaRulesService {
     }
     requestHash(rules, effectiveFrom) {
         return (0, crypto_1.createHash)('sha256')
-            .update(`${canonicalJson(rules)}|${effectiveFrom}`)
+            .update(`${(0, iqama_rules_canonical_1.canonicalJson)(rules)}|${effectiveFrom}`)
             .digest('hex');
     }
     issuePreviewId(requestHash, revision, conflictCount) {
@@ -246,7 +235,11 @@ let IqamaRulesService = class IqamaRulesService {
             current.push(...cur.filter(inRange));
             proposed.push(...prop.filter(inRange));
         }
-        const byPrayer = Object.fromEntries(iqama_rules_types_1.PRAYER_NAMES.map((p) => [p, { daysChanged: 0, daysClamped: 0 }]));
+        const byPrayer = Object.fromEntries(iqama_rules_types_1.PRAYER_NAMES.map((p) => [
+            p,
+            { daysChanged: 0, daysClamped: 0, ...(0, iqama_rules_preview_stats_1.emptyStats)() },
+        ]));
+        const total = (0, iqama_rules_preview_stats_1.emptyStats)();
         const conflicts = [];
         let conflictDays = 0;
         const changedDates = [];
@@ -257,7 +250,19 @@ let IqamaRulesService = class IqamaRulesService {
             let changed = false;
             let clamped = false;
             const prayers = {};
+            const dayClass = {
+                changed: false,
+                movedNow: false,
+                movedProposed: false,
+                newlyMoved: false,
+                noLongerMoved: false,
+            };
             for (const name of iqama_rules_types_1.PRAYER_NAMES) {
+                const k = (0, iqama_rules_preview_stats_1.classifyDay)(c[name], p[name]);
+                (0, iqama_rules_preview_stats_1.addDay)(byPrayer[name], p.date, k, FIRST_DATES);
+                for (const key of Object.keys(dayClass)) {
+                    dayClass[key] ||= k[key];
+                }
                 const ch = c[name].iqama !== p[name].iqama;
                 const cl = p[name].iqama_clamped === true;
                 if (ch)
@@ -289,6 +294,7 @@ let IqamaRulesService = class IqamaRulesService {
                     });
                 }
             }
+            (0, iqama_rules_preview_stats_1.addDay)(total, p.date, dayClass, FIRST_DATES);
             if (changed)
                 changedDates.push(p.date);
             if (clamped)
@@ -315,6 +321,7 @@ let IqamaRulesService = class IqamaRulesService {
                 conflictDays,
                 firstChangedDates: changedDates.slice(0, FIRST_DATES),
                 firstClampedDates: clampedDates.slice(0, FIRST_DATES),
+                ...total,
                 byPrayer,
             },
         };

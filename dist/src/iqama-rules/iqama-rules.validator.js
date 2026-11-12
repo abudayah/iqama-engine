@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateRuleSet = validateRuleSet;
 const iqama_guardrail_1 = require("../rules/iqama-guardrail");
 const iqama_rules_catalog_1 = require("./iqama-rules.catalog");
+const iqama_rules_canonical_1 = require("./iqama-rules.canonical");
 const iqama_rules_types_1 = require("./iqama-rules.types");
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ROUND_STEPS = iqama_rules_catalog_1.RANGES.roundingSteps;
@@ -149,7 +150,7 @@ function validateRuleSet(rules, effectiveFrom, previous) {
             iqama_rules_types_1.LOCKABLE_PRAYERS.includes(prayer) &&
             new Date(`${effectiveFrom}T00:00:00Z`).getUTCDay() !== 5 &&
             (!previous ||
-                JSON.stringify(previous[prayer]) !== JSON.stringify(rules?.[prayer]))) {
+                (0, iqama_rules_canonical_1.canonicalJson)(previous[prayer]) !== (0, iqama_rules_canonical_1.canonicalJson)(rules?.[prayer]))) {
             errors.push({
                 path: `${prayer}.effectiveFrom`,
                 message: `${prayer} changes must start on a Friday (got ${effectiveFrom})`,

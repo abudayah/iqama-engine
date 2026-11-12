@@ -1,10 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
+import { canonicalJson } from './iqama-rules.canonical';
 import { RuleSet } from './iqama-rules.types';
 import type { PreviewIqamaRulesDto } from './dto/preview-iqama-rules.dto';
 import type { CreateIqamaRulesVersionDto } from './dto/create-iqama-rules-version.dto';
-export declare function canonicalJson(value: unknown): string;
+export { canonicalJson };
 export declare function nextFriday(today: string): string;
 export declare class IqamaRulesService {
     private readonly prisma;
@@ -281,6 +282,24 @@ export declare class IqamaRulesService {
             prayers: Record<string, unknown>;
         }[];
         summary: {
+            byPrayer: {
+                [k: string]: {
+                    changedDays: number;
+                    movedNow: number;
+                    movedProposed: number;
+                    newlyMoved: number;
+                    newlyMovedDates: string[];
+                    noLongerMoved: number;
+                    daysChanged: number;
+                    daysClamped: number;
+                };
+            };
+            changedDays: number;
+            movedNow: number;
+            movedProposed: number;
+            newlyMoved: number;
+            newlyMovedDates: string[];
+            noLongerMoved: number;
             from: string;
             to: string;
             totalDays: number;
@@ -290,12 +309,6 @@ export declare class IqamaRulesService {
             conflictDays: number;
             firstChangedDates: string[];
             firstClampedDates: string[];
-            byPrayer: {
-                [k: string]: {
-                    daysChanged: number;
-                    daysClamped: number;
-                };
-            };
         };
     }>;
     createVersion(dto: CreateIqamaRulesVersionDto, actor: string): Promise<{
