@@ -79,7 +79,7 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 ### The Five Prayers
 
 1. **Fajr (Dawn)** — Dynamic calculation with sunrise protection
-2. **Dhuhr (Noon)** — Fixed time based on DST status
+2. **Dhuhr (Noon)** — Fixed 13:45 year-round (Friday 13:40)
 3. **Asr (Afternoon)** — Clean 30-minute intervals
 4. **Maghrib (Sunset)** — Simple 5-minute offset
 5. **Isha (Night)** — Seasonal scaling based on sunset time
@@ -87,6 +87,43 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 Each prayer uses its own astronomical time for maximum accuracy.
 
 For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md`.
+
+### Admin-configurable rules (iqama rule engine)
+
+Rules can be stored in the database (`IqamaRuleVersion`, append-only, versioned by effective date) and edited through the admin API. Per prayer the pipeline is fixed:
+
+```
+base (OFFSET | FIXED_TIME | SCALED_GAP | SEASONAL)
+  -> modifiers (limits, rounding, weekday adjust, weekly lock)
+  -> admin override
+  -> fixed guardrails
+```
+
+Fixed guardrails (constants in code, not configurable):
+
+1. Iqama is at least Azan + 3 minutes, overrides included.
+2. Fajr Iqama ends at least 60 minutes before sunrise.
+3. Fajr, Dhuhr, Asr and Isha rules may only change starting on a Friday.
+4. Maghrib may start any day.
+5. Every final Iqama lands on a 5-minute mark (rounded up, or down for a FLOOR rule, never below Azan + 3).
+
+When a guardrail changes a time, that prayer in the schedule response has `"iqama_clamped": true`.
+
+Dhuhr is 13:45 year-round (Friday 13:40); British Columbia no longer changes clocks.
+
+**`IQAMA_RULES` environment variable**
+
+| Value              | Behaviour                                                            |
+| ------------------ | -------------------------------------------------------------------- |
+| `legacy` (default) | Hard-coded rules in `src/rules`                                      |
+| `shadow`           | Compute DB rules too, log `[iqama shadow]` differences, serve legacy |
+| `db`               | Serve the DB rules                                                   |
+
+`IQAMA_RULES_CUTOVER` (default `2026-11-13`, a Friday) is the first date served by the DB rules; earlier dates keep the legacy behaviour. In `db` mode a missing or invalid stored rule set is an explicit HTTP 500 (`IQAMA_RULES_MISSING` / `IQAMA_RULES_INVALID`), never a silent fallback. Overrides: the newest wins, and two overrides for the same prayer may not overlap (409). `iqama_conflict: true` marks Fajr days where Azan + 3 minutes beats the 60-minutes-before-sunrise rule.
+
+**Admin API** (`X-API-Key`): `GET /api/v1/admin/iqama-rules`, `GET .../catalog`, `POST .../preview`, `PUT .../base`. See `.kiro/steering/iqama-rules-system.md`.
+
+**Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, `npx ts-node scripts/report-override-overlaps.ts`, and the cutover steps in `docs/iqama-rules-cutover-runbook.md`.
 
 ## API Endpoints
 
@@ -213,7 +250,7 @@ X-API-Key: your-admin-api-key
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 22.23.5 or newer (see `.nvmrc`) and npm. Older builds have old timezone data and get B.C. winter time wrong
 
 ### Setup
 

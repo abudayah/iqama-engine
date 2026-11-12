@@ -1,9 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { warnIfStaleTzdata } from './config/tzdata-guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Log loudly if this Node build has old timezone data (B.C. is UTC-7 all year).
+  warnIfStaleTzdata(
+    app.get(ConfigService).get<string>('app.masjidTimezone') ?? '',
+  );
 
   // Disable nginx/proxy caching for all API responses
   app.use(

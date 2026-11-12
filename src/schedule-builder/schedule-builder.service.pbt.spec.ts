@@ -56,7 +56,7 @@ describe('ScheduleBuilderService — Property-Based Tests', () => {
     };
 
     const mockOverrideService = {
-      getOverridesForDate: jest.fn().mockResolvedValue([]),
+      getOverridesForRange: jest.fn().mockResolvedValue([]),
       applyOverrides: jest.fn().mockReturnValue({
         iqamaTimes: {
           fajr: '04:15',

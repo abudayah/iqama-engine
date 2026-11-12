@@ -16,23 +16,32 @@ describe('Dhuhr Rule', () => {
   });
 
   describe('computeDhuhrIqama', () => {
-    it('should return 13:45 during DST', () => {
-      const result = computeDhuhrIqama('2025-06-15', 'America/Vancouver');
-      expect(result).toBe('13:45');
+    const tz = 'America/Vancouver';
+    const cutover = '2026-11-13';
+
+    it('is 13:45 on non-Fridays from the cutover on, year-round', () => {
+      expect(computeDhuhrIqama('2026-12-14', tz, cutover)).toBe('13:45');
+      expect(computeDhuhrIqama('2027-07-05', tz, cutover)).toBe('13:45');
     });
 
-    it('should return 12:45 during standard time', () => {
-      const result = computeDhuhrIqama('2025-12-15', 'America/Vancouver');
-      expect(result).toBe('12:45');
+    it('is 13:40 on Fridays from the cutover on, year-round', () => {
+      expect(computeDhuhrIqama('2026-11-13', tz, cutover)).toBe('13:40');
+      expect(computeDhuhrIqama('2026-12-11', tz, cutover)).toBe('13:40');
     });
 
-    it('should handle DST transition dates correctly', () => {
-      // Test dates around DST transitions
-      const springResult = computeDhuhrIqama('2025-03-15', 'America/Vancouver');
-      const fallResult = computeDhuhrIqama('2025-11-15', 'America/Vancouver');
+    it('stays 13:45 / 13:40 after clocks stopped changing (2027+)', () => {
+      expect(computeDhuhrIqama('2027-01-01', tz, cutover)).toBe('13:40'); // Friday
+      expect(computeDhuhrIqama('2027-01-04', tz, cutover)).toBe('13:45');
+      expect(computeDhuhrIqama('2027-07-09', tz, cutover)).toBe('13:40'); // Friday
+    });
 
-      expect(['12:45', '13:45']).toContain(springResult);
-      expect(['12:45', '13:45']).toContain(fallResult);
+    it('keeps the historical DST rule before the cutover', () => {
+      // DST: 13:45 (Fri 13:40); standard time: 12:45 (Fri 12:40)
+      expect(computeDhuhrIqama('2025-06-16', tz, cutover)).toBe('13:45');
+      expect(computeDhuhrIqama('2025-06-13', tz, cutover)).toBe('13:40');
+      expect(computeDhuhrIqama('2025-12-15', tz, cutover)).toBe('12:45');
+      expect(computeDhuhrIqama('2025-12-12', tz, cutover)).toBe('12:40');
+      expect(computeDhuhrIqama('2026-06-01', tz, cutover)).toBe('13:45'); // DST in 2026
     });
   });
 });
