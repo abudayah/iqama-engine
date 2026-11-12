@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -20,6 +21,8 @@ describe('HealthController', () => {
     prismaService = module.get(PrismaService);
   });
 
+  afterEach(() => jest.restoreAllMocks());
+
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
@@ -37,26 +40,31 @@ describe('HealthController', () => {
       expect(prismaService.$queryRaw).toHaveBeenCalled();
     });
 
-    it('should return degraded status when database is down', async () => {
-      const dbError = new Error('Connection refused');
-      prismaService.$queryRaw.mockRejectedValue(dbError);
+    it('returns 503 with a generic body and never the raw error text', async () => {
+      const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      prismaService.$queryRaw.mockRejectedValue(
+        new Error('Connection refused: file:/secret/path/db.sqlite'),
+      );
 
-      const result = await controller.check();
+      const err: unknown = await controller.check().catch((e: unknown) => e);
 
-      expect(result.status).toBe('degraded');
-      expect(result.services.database).toBe('down');
-      expect(result.services.api).toBe('up');
-      expect(result.timestamp).toBeDefined();
-      expect(result.error).toBe('Connection refused');
+      expect(err).toBeInstanceOf(ServiceUnavailableException);
+      const e = err as ServiceUnavailableException;
+      expect(e.getStatus()).toBe(503);
+      expect(e.getResponse()).toEqual({ status: 'error', db: 'down' });
+      expect(JSON.stringify(e.getResponse())).not.toContain('secret');
+      // the real error is logged server-side
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(String(logged.mock.calls[0][1])).toContain('Connection refused');
     });
 
-    it('should handle non-Error exceptions', async () => {
+    it('handles non-Error exceptions the same way', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation();
       prismaService.$queryRaw.mockRejectedValue('Unknown error');
 
-      const result = await controller.check();
-
-      expect(result.status).toBe('degraded');
-      expect(result.error).toBe('Unknown error');
+      await expect(controller.check()).rejects.toMatchObject({
+        response: { status: 'error', db: 'down' },
+      });
     });
   });
 });

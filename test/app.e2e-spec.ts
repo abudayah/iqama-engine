@@ -11,6 +11,11 @@ const mockPrismaService = {
   override: {
     findMany: jest.fn().mockResolvedValue([]),
   },
+  $queryRaw: jest.fn().mockResolvedValue([]),
+  specialPrayer: { findMany: jest.fn().mockResolvedValue([]) },
+  adhanConfigVersion: { findMany: jest.fn().mockResolvedValue([]) },
+  adhanConfigPeriod: { findMany: jest.fn().mockResolvedValue([]) },
+  qiyamConfig: { findUnique: jest.fn().mockResolvedValue(null) },
   $connect: jest.fn(),
   $disconnect: jest.fn(),
 };

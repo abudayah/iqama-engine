@@ -7,6 +7,9 @@ import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { HijriCalendarModule } from './hijri-calendar/hijri-calendar.module';
 import { AdhanConfigModule } from './adhan-config/adhan-config.module';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { THROTTLER_OPTIONS } from './throttle/throttle.config';
 import { IqamaRulesModule } from './iqama-rules/iqama-rules.module';
 import { join } from 'path';
 
@@ -22,6 +25,7 @@ import { join } from 'path';
       ttl: 10 * 60 * 1000, // 10-minute safety-net TTL (ms for cache-manager v5)
       max: 100, // Store up to 100 months in cache
     }),
+    ThrottlerModule.forRoot(THROTTLER_OPTIONS),
     ScheduleModule,
     AdminModule,
     HealthModule,
@@ -30,6 +34,6 @@ import { join } from 'path';
     IqamaRulesModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

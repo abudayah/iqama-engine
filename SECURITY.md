@@ -23,7 +23,7 @@ In scope:
 Out of scope:
 
 - Findings that need physical access to the server or a compromised admin key
-- Denial of service by sending a very large volume of requests (there is no rate limiting, see below)
+- Denial of service by sending a very large volume of requests (the application has per-IP rate limits, see below, but is not a substitute for protection at the proxy or hosting layer)
 - Issues in third-party services (GitHub, hosting provider) or in the separate UI repository
 
 ## Authentication model (as implemented)
@@ -32,7 +32,7 @@ There are no user accounts, roles or sessions.
 
 - Administration uses **one shared admin key**. The caller sends it in the `x-api-key` header and the server compares it with the `ADMIN_PASSWORD` environment variable. The comparison hashes both values with SHA-256 and uses `timingSafeEqual` (`src/auth/api-key.guard.ts`).
 - If `ADMIN_PASSWORD` is not set on the server, every protected request is rejected with `401`.
-- Protected routes: everything under `/api/v1/admin/` (overrides, cache clear, Azan configuration), and in `/api/v1/hijri-calendar` the moon-sighting `POST`/`DELETE` `override` and `POST` `qiyam-config`.
+- Protected routes: everything under `/api/v1/admin/` (overrides, cache clear, Azan configuration, Iqama rules), and in `/api/v1/hijri-calendar` the moon-sighting `POST`/`DELETE` `override` and `POST` `qiyam-config`.
 - Public routes (no key): `GET /api/v1/schedule`, `GET /api/v1/health`, and `GET` `status`, `eid-prayers` and `qiyam-config` under `/api/v1/hijri-calendar`.
 - Because the key is shared, actions are not attributable to a person, and the key cannot be revoked per person. Rotating it means changing `ADMIN_PASSWORD` and restarting the service.
 - The key is sent in a request header, so the service must be served over HTTPS. The application itself does not terminate TLS.
@@ -46,7 +46,7 @@ There are no user accounts, roles or sessions.
 
 ## CORS
 
-CORS is controlled by the `CORS_ORIGIN` environment variable (`src/main.ts`):
+CORS is controlled by the `CORS_ORIGIN` environment variable (`src/app.setup.ts`):
 
 - Not set or empty: CORS headers are not sent.
 - A comma-separated list: only those origins are allowed.
@@ -58,11 +58,13 @@ CORS only limits browsers. It is not a substitute for the admin key.
 ## Other protections, and what is not present
 
 - Present: a global `ValidationPipe` (`whitelist: true`) validates request bodies and query parameters with DTOs; all responses are sent with `Cache-Control: no-store`; the Prisma client is used for database access.
-- Not present: HTTP security headers middleware (`helmet` is not a dependency), and rate limiting or throttling (no such package or code in the repository). Brute-force attempts on the admin key are not slowed down by the application; add limits at the reverse proxy or hosting layer if the service is exposed publicly.
-- The public `GET /api/v1/health` endpoint returns the database error message when the database check fails.
+- Security headers: `helmet` is applied to every response (`src/app.setup.ts`). Because the API serves JSON to other origins, `Cross-Origin-Resource-Policy` is set to `cross-origin`; CORS is still decided by `CORS_ORIGIN`.
+- Rate limiting (`@nestjs/throttler`, in-memory, per client IP, 60-second window): 300 requests per minute on public routes, and 120 requests per minute in total across all routes protected by `ApiKeyGuard`. Failed key attempts count too, so guessing the admin key is slowed down. Over the limit the API answers `429`. CORS preflight requests are not counted. The counters live in memory, so they reset when the service restarts and are not shared between several instances.
+- `TRUST_PROXY` (environment variable, default off): by default the client IP is the address of the direct connection and `X-Forwarded-For` is ignored, so a client cannot dodge the limits by sending that header. Behind a reverse proxy every request then appears to come from the proxy and all clients share one limit; set `TRUST_PROXY` to `loopback` (proxy on the same host, e.g. Apache/Passenger) or to the proxy's IPs/CIDRs. A hop count (such as `1`) or `true` trusts `X-Forwarded-For` from any sender: if the Node port can be reached directly, a client can fake its IP and dodge the per-IP limits. Use those only when the app port is reachable solely through the proxy; the app logs a startup warning for them. The app port must not be publicly reachable. See `.env.example` and Express's [behind proxies](https://expressjs.com/en/guide/behind-proxies.html) guide.
+- The public `GET /api/v1/health` endpoint returns only a generic body when the database check fails (`503` with `{"status":"error","db":"down"}`); the real error is written to the server log.
 
 ## Dependencies
 
 - Dependencies are pinned through `package-lock.json` and installed with `npm ci` in CI.
-- No automated dependency update tool (such as Dependabot) is configured in this repository. Dependencies are updated manually; running `npm audit` periodically is recommended.
+- Dependabot (`.github/dependabot.yml`) opens weekly update pull requests for npm and GitHub Actions; minor and patch updates are grouped, major updates come separately. Running `npm audit` periodically is still recommended.
 - Pull requests that add a dependency should say why it is needed and that it is actively maintained.

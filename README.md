@@ -125,6 +125,8 @@ Dhuhr is 13:45 year-round (Friday 13:40); British Columbia no longer changes clo
 
 **Operations**: `npx prisma migrate deploy && npx prisma db seed` (seeds version 1), `npx ts-node scripts/check-overrides-guardrail.ts`, `npx ts-node scripts/report-override-overlaps.ts`, and the cutover steps in `docs/iqama-rules-cutover-runbook.md`.
 
+**Security**: responses carry `helmet` headers; public routes allow 300 requests per minute per IP and all admin routes share 120 per minute (`429` beyond). Behind a reverse proxy set `TRUST_PROXY` (prefer `loopback` or the proxy's IPs/CIDRs). See `SECURITY.md`.
+
 ## API Endpoints
 
 ### Public Endpoints
