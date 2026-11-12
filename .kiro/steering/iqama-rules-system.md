@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: '{src/iqama-rules/**,src/schedule-builder/**,src/override/**,prisma/seed*,scripts/**}'
+fileMatchPattern: '{src/iqama-rules/**,src/schedule-builder/**,src/override/**,src/rules/**,src/adhan/**,prisma/seed*,scripts/**}'
 ---
 
 # Iqama Rules System (admin-configurable rules)
@@ -36,17 +36,29 @@ base -> modifiers -> admin override -> hard guardrails
 
 A date uses the version with the greatest `effectiveFrom` <= that date (ties: higher id). A date before the first version uses the earliest version, so past dates keep working. Production's version 1 starts on 2026-11-13 (a Friday). Behaviour change from the removal: past winter dates now show Dhuhr 13:45 (Friday 13:40); the old DST rule showed 12:45 (Friday 12:40) before 2026-11-13.
 
-## Today's rules (seed, version 1, effectiveFrom 2026-11-13)
+## Default seed rules (version 1)
 
-| Prayer  | Rule                                                                                                                   |
-| ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Fajr    | OFFSET 75, min after Azan 10, ends at least 60 min before sunrise, CEIL 5, weekly lock                                 |
-| Dhuhr   | FIXED_TIME 13:45, Friday −5 (13:40). B.C. no longer changes clocks, so no DST logic.                                   |
-| Asr     | SEASONAL: Jan first Friday 16:00, Mar 15 18:00, Sep first Friday 17:00, Oct first Friday 16:30, Nov first Friday 15:45 |
-| Maghrib | OFFSET 5, CEIL 5                                                                                                       |
-| Isha    | SCALED_GAP 15 min at 20:00 → 5 min at 22:00, min after Azan 3, FLOOR 5, weekly lock                                    |
+> Only the seed (`src/iqama-rules/iqama-rules.seed.ts`, what a fresh database starts with). **The live rules are whatever is stored and the Imam edits them in the admin; read them via `GET /api/v1/admin/iqama-rules` (`effective` / `latest`). Do not copy times from here.**
 
-Known effect: with clocks fixed at UTC-7, the Asr 16:00 "Late Winter" segment is below the 3-minute floor from 2027-02-11 to 2027-03-14 (32 days). The guardrail raises those days (`iqama_clamped: true`); the rule was deliberately not redesigned.
+- **Fajr:** `OFFSET` Azan + 75, at least 10 after Azan, ends at least 60 before sunrise, round up to 5, weekly lock.
+- **Dhuhr:** `FIXED_TIME` 13:45, Friday −5 (Friday shows the Khutbah start, 5 minutes before the prayer).
+- **Asr:** `SEASONAL`, 5 segments: starts on the first Friday of January, September, October and November, plus the fixed date March 15; the times are in the seed file.
+- **Maghrib:** `OFFSET` Azan + 5, round up to 5.
+- **Isha:** `SCALED_GAP` 15 minutes at Azan 20:00 falling to 5 at 22:00, at least 3 after Azan, round down to 5, weekly lock.
+
+## How the pieces behave
+
+- **Azan.** Times come from the `adhan` library with the stored Azan settings (admin `adhan-config`; seeded default: ISNA 15°/15°, Shafi'i, `TwilightAngle` high-latitude rule, a summer Isha −6 minute period). Each day uses its own Azan; B.C. is UTC-7 all year since 2026-03-08, so no rule may depend on DST (`is_dst` is display-only).
+- **Weekly lock (Friday to Thursday).** The week runs from a Friday through the next Thursday. The locked prayer shows the latest per-day result of that week, so the congregation sees one stable time all week. With a sunrise limit the held time is also capped by the earliest `sunrise − N` in the week and floored to the rounding step, so every day of the week respects the limit.
+- **Fajr and sunrise.** The limit keeps Fajr at least N minutes before sunrise; the min-after-Azan limit raises it first and the sunrise limit wins in the rule. The fixed guardrail then enforces Azan + 3: if the two cannot both hold on some day, the gap wins, the day is flagged `iqama_conflict`, and saving a proposal with such days needs `acknowledgeConflicts: true`.
+- **Seasonal segments.** A segment holds from its start until the next segment's start; the last one wraps over New Year. `FIRST_FRIDAY` starts are computed for each year (the first Friday of that month), so the time only changes on a Jumu'ah; between the 1st of that month and its first Friday the previous season still applies. `DATE` starts are fixed calendar dates. Both switch on the start day itself.
+- **Scaled gap.** Between points the gap interpolates linearly with the Azan time and is held flat outside them.
+- **Known clamp.** With clocks fixed at UTC-7, an Asr time of 16:00 in the late-winter segment is below Azan + 3 from 2027-02-11 to 2027-03-14 (32 days); the guardrail raises those days (`iqama_clamped: true`). An admin can change the rule; the snapshot test still records the seed behaviour.
+- **Hijri features** (Qiyam, Eid, moon sighting) are documented in `hijri-calendar-module.md`.
+
+## Changing rules or tests
+
+Time changes are normal data changes: use the admin (preview, then save a new version on a Friday for Fajr/Dhuhr/Asr/Isha). A code change to rules, the evaluator, the guardrails or the Azan inputs must keep the snapshot test green or regenerate it on purpose and review the diff (see the code map). Each rule type has unit tests plus fast-check properties (Iqama >= Azan + 3, rounding invariants, validator ranges).
 
 ## Code map (`src/iqama-rules/`)
 

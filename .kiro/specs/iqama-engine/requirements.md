@@ -1,3 +1,5 @@
+> ARCHIVED: describes the original hard-coded rules (removed in PR #13). Superseded by .kiro/specs/iqama-rules-admin/. Kept for history; do not use as a guide to current behaviour.
+
 # Requirements Document
 
 ## Introduction

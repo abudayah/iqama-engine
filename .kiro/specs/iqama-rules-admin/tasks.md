@@ -40,7 +40,7 @@ Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqa
   - Done in the UI repository; not tracked here.
 
 - [x] 4. Phase 4A: Docs, steering, spec, runbook (commit `phase 4`)
-  - [x] 4.1 Steering `iqama-rules-system.md`, updated `prayer-rules-overview.md`, README
+  - [x] 4.1 Steering `iqama-rules-system.md`, README (`prayer-rules-overview.md` and `asr-seasonal-schedule.md` were later folded into `iqama-rules-system.md`)
   - [x] 4.2 This spec
   - [x] 4.3 `docs/iqama-rules-cutover-runbook.md`
 

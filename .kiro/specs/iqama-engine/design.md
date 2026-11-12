@@ -1,3 +1,5 @@
+> ARCHIVED: describes the original hard-coded rules (removed in PR #13). Superseded by .kiro/specs/iqama-rules-admin/. Kept for history; do not use as a guide to current behaviour.
+
 # Design Document — iqama-engine
 
 ## Overview
@@ -98,13 +100,20 @@ class AdhanAdapter {
 ```
 
 **Adhan configuration:**
+
 ```typescript
-import { Coordinates, CalculationMethod, PrayerTimes, Madhab, Rounding } from 'adhan';
+import {
+  Coordinates,
+  CalculationMethod,
+  PrayerTimes,
+  Madhab,
+  Rounding,
+} from 'adhan';
 
 const coordinates = new Coordinates(lat, lng);
 const params = CalculationMethod.NorthAmerica(); // ISNA method
-params.madhab = Madhab.Shafi;                    // Asr standard (shadow ratio = 1)
-params.rounding = Rounding.None;                 // preserve sub-minute precision
+params.madhab = Madhab.Shafi; // Asr standard (shadow ratio = 1)
+params.rounding = Rounding.None; // preserve sub-minute precision
 
 const pt = new PrayerTimes(coordinates, jsDate, params);
 // pt.fajr, pt.sunrise, pt.dhuhr, pt.asr, pt.maghrib, pt.isha are UTC Date objects
@@ -117,7 +126,7 @@ Orchestrates FR1–FR5 for a single date. Accepts raw prayer times and returns c
 
 ```typescript
 interface IqamaTimes {
-  fajr: string;    // HH:mm
+  fajr: string; // HH:mm
   dhuhr: string;
   asr: string;
   maghrib: string;
@@ -125,7 +134,11 @@ interface IqamaTimes {
 }
 
 class RulesService {
-  computeIqama(date: string, raw: RawPrayerTimes, fridayRaw?: RawPrayerTimes): IqamaTimes;
+  computeIqama(
+    date: string,
+    raw: RawPrayerTimes,
+    fridayRaw?: RawPrayerTimes,
+  ): IqamaTimes;
 }
 ```
 
@@ -161,7 +174,10 @@ class CacheService {
 ```typescript
 class ScheduleService {
   getScheduleForDate(date: string): Promise<DailySchedule>;
-  getScheduleForRange(startDate: string, endDate: string): Promise<DailySchedule[]>;
+  getScheduleForRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<DailySchedule[]>;
 }
 ```
 
@@ -198,6 +214,7 @@ class ScheduleQueryDto {
 ```
 
 Validation logic (enforced in the service or a custom pipe):
+
 - `date` and (`start_date` or `end_date`) are mutually exclusive → 400
 - Neither `date` nor both of `start_date`+`end_date` provided → 400
 
@@ -205,13 +222,13 @@ Validation logic (enforced in the service or a custom pipe):
 
 ```typescript
 interface PrayerEntry {
-  azan: string;   // HH:mm
-  iqama: string;  // HH:mm
+  azan: string; // HH:mm
+  iqama: string; // HH:mm
 }
 
 interface DailySchedule {
-  date: string;         // YYYY-MM-DD
-  day_of_week: string;  // e.g. "Friday"
+  date: string; // YYYY-MM-DD
+  day_of_week: string; // e.g. "Friday"
   is_dst: boolean;
   fajr: PrayerEntry;
   dhuhr: PrayerEntry;
@@ -242,14 +259,14 @@ model Override {
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `MASJID_LATITUDE` | `49.2514` | Masjid latitude |
-| `MASJID_LONGITUDE` | `-122.7740` | Masjid longitude |
-| `MASJID_TIMEZONE` | `America/Vancouver` | IANA timezone string |
-| `UPSTASH_REDIS_URL` | — | Upstash Redis REST URL |
-| `UPSTASH_REDIS_TOKEN` | — | Upstash Redis REST token |
-| `DATABASE_URL` | — | PostgreSQL connection string |
+| Variable              | Default             | Description                  |
+| --------------------- | ------------------- | ---------------------------- |
+| `MASJID_LATITUDE`     | `49.2514`           | Masjid latitude              |
+| `MASJID_LONGITUDE`    | `-122.7740`         | Masjid longitude             |
+| `MASJID_TIMEZONE`     | `America/Vancouver` | IANA timezone string         |
+| `UPSTASH_REDIS_URL`   | —                   | Upstash Redis REST URL       |
+| `UPSTASH_REDIS_TOKEN` | —                   | Upstash Redis REST token     |
+| `DATABASE_URL`        | —                   | PostgreSQL connection string |
 
 ---
 
@@ -343,7 +360,7 @@ if dayOfWeek(date) == Friday:
     fridayDate = date
 else:
     fridayDate = most recent preceding Friday
-    
+
 fridayRaw = adhan.getPrayerTimes(fridayDate)
 
 Fajr_Iqama  = FR3(fridayRaw.fajr, fridayRaw.sunrise)
@@ -391,16 +408,16 @@ for each prayer:
 
 ## Error Handling
 
-| Scenario | HTTP Status | Response |
-|---|---|---|
-| `date` + `start_date`/`end_date` both provided | 400 | `{ message: "Cannot use 'date' together with 'start_date' or 'end_date'" }` |
-| Neither `date` nor `start_date`+`end_date` | 400 | `{ message: "Provide either 'date' or both 'start_date' and 'end_date'" }` |
-| Only one of `start_date`/`end_date` | 400 | `{ message: "'start_date' and 'end_date' must be provided together" }` |
-| Invalid date format | 400 | `{ message: "Date values must be in YYYY-MM-DD format" }` |
-| `start_date` > `end_date` | 400 | `{ message: "'start_date' must not be after 'end_date'" }` |
-| Redis unavailable | — | Transparent fallback to in-memory cache; no error surfaced to client |
-| PostgreSQL unavailable | 503 | `{ message: "Service temporarily unavailable" }` |
-| Adhan library returns undefined time (polar edge case) | 500 | `{ message: "Could not compute prayer times for the requested date" }` |
+| Scenario                                               | HTTP Status | Response                                                                    |
+| ------------------------------------------------------ | ----------- | --------------------------------------------------------------------------- |
+| `date` + `start_date`/`end_date` both provided         | 400         | `{ message: "Cannot use 'date' together with 'start_date' or 'end_date'" }` |
+| Neither `date` nor `start_date`+`end_date`             | 400         | `{ message: "Provide either 'date' or both 'start_date' and 'end_date'" }`  |
+| Only one of `start_date`/`end_date`                    | 400         | `{ message: "'start_date' and 'end_date' must be provided together" }`      |
+| Invalid date format                                    | 400         | `{ message: "Date values must be in YYYY-MM-DD format" }`                   |
+| `start_date` > `end_date`                              | 400         | `{ message: "'start_date' must not be after 'end_date'" }`                  |
+| Redis unavailable                                      | —           | Transparent fallback to in-memory cache; no error surfaced to client        |
+| PostgreSQL unavailable                                 | 503         | `{ message: "Service temporarily unavailable" }`                            |
+| Adhan library returns undefined time (polar edge case) | 500         | `{ message: "Could not compute prayer times for the requested date" }`      |
 
 All errors follow NestJS's standard exception filter format with `statusCode`, `message`, and `error` fields.
 
@@ -411,6 +428,7 @@ All errors follow NestJS's standard exception filter format with `statusCode`, `
 ### Unit Tests
 
 Each rule function (FR1–FR5) is tested in isolation with concrete examples:
+
 - FR1: verify `CeilingToNearest5(Azan + 5)` for a known Azan time
 - FR2: verify `13:45` when DST active, `12:45` when not
 - FR3: verify the three branches (Max_Delay wins, Safe_Sunrise_Limit wins, floor clamp applied)
@@ -441,12 +459,11 @@ Tag format: `// Feature: iqama-engine, Property N: <property text>`
 - Prisma connects to PostgreSQL on startup
 - Redis connection is attempted; in-memory fallback activates when unavailable
 
-
 ---
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+_A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees._
 
 The property-based testing library for this project is **[fast-check](https://github.com/dubzzz/fast-check)** (TypeScript-native). Each property test runs a minimum of **100 iterations**.
 
@@ -454,7 +471,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 1: Maghrib Iqama formula holds for all Azan times
 
-*For any* valid Maghrib Azan time (represented as minutes since midnight), the computed Maghrib Iqama must equal `CeilingToNearest5(Azan + 5 minutes)`.
+_For any_ valid Maghrib Azan time (represented as minutes since midnight), the computed Maghrib Iqama must equal `CeilingToNearest5(Azan + 5 minutes)`.
 
 **Validates: Requirements 2.1**
 
@@ -462,7 +479,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 2: DST flag is correct for all dates
 
-*For any* date in the Masjid_Timezone, the `is_dst` field in the response must equal `true` if and only if the UTC offset of that date is greater than the UTC offset of January 1st of the same year (as determined by `dayjs.tz`).
+_For any_ date in the Masjid_Timezone, the `is_dst` field in the response must equal `true` if and only if the UTC offset of that date is greater than the UTC offset of January 1st of the same year (as determined by `dayjs.tz`).
 
 **Validates: Requirements 3.3**
 
@@ -470,7 +487,8 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 3: Fajr Iqama satisfies the floor clamp and rounding invariants
 
-*For any* Fajr Azan time and Sunrise time, the computed Fajr Iqama must satisfy both:
+_For any_ Fajr Azan time and Sunrise time, the computed Fajr Iqama must satisfy both:
+
 1. `Iqama >= Azan + 10 minutes` (floor clamp is always respected), and
 2. `Iqama minutes value is divisible by 5` (CeilingToNearest5 was applied).
 
@@ -480,7 +498,8 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 4: Asr Iqama always lands on a :00 or :30 boundary
 
-*For any* Asr Azan time, the computed Asr Iqama must satisfy both:
+_For any_ Asr Azan time, the computed Asr Iqama must satisfy both:
+
 1. `Iqama minutes value is either 0 or 30`, and
 2. `Iqama >= Azan + 15 minutes`.
 
@@ -490,7 +509,8 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 5: Isha gap is always in [5, 15] minutes and output is rounded to nearest 5
 
-*For any* Isha Azan time, the interpolated gap used to compute the Iqama must be in the range `[5, 15]` minutes (inclusive), and the final Iqama must equal `CeilingToNearest5(Azan + gap)`. Specifically:
+_For any_ Isha Azan time, the interpolated gap used to compute the Iqama must be in the range `[5, 15]` minutes (inclusive), and the final Iqama must equal `CeilingToNearest5(Azan + gap)`. Specifically:
+
 - If Azan > 22:30, gap = 5
 - If Azan < 20:00, gap = 15
 - If Azan ∈ [20:00, 22:30], gap ∈ [5, 15] and decreases monotonically as Azan increases
@@ -501,7 +521,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 6: Friday Block — non-Friday dates use the preceding Friday's Fajr, Asr, and Isha Iqama
 
-*For any* non-Friday date D, the computed Fajr, Asr, and Isha Iqama times must equal the Fajr, Asr, and Isha Iqama times that would be computed for the immediately preceding Friday. The preceding Friday must be the most recent Friday strictly before D (1–6 days prior).
+_For any_ non-Friday date D, the computed Fajr, Asr, and Isha Iqama times must equal the Fajr, Asr, and Isha Iqama times that would be computed for the immediately preceding Friday. The preceding Friday must be the most recent Friday strictly before D (1–6 days prior).
 
 **Validates: Requirements 6.2, 6.3, 6.4**
 
@@ -509,7 +529,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 7: Maghrib and Dhuhr are never affected by the Friday Block
 
-*For any* non-Friday date D, the Maghrib Iqama must equal `CeilingToNearest5(D's own Maghrib Azan + 5 minutes)`, and the Dhuhr Iqama must equal the DST-determined fixed value (`13:45` or `12:45`) for date D — neither must equal the preceding Friday's value when the Azans differ.
+_For any_ non-Friday date D, the Maghrib Iqama must equal `CeilingToNearest5(D's own Maghrib Azan + 5 minutes)`, and the Dhuhr Iqama must equal the DST-determined fixed value (`13:45` or `12:45`) for date D — neither must equal the preceding Friday's value when the Azans differ.
 
 **Validates: Requirements 2.2, 2.3, 3.5, 6.5**
 
@@ -517,7 +537,8 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 8: FIXED override always replaces the Iqama; OFFSET override applies CeilingToNearest5; has_overrides reflects override application
 
-*For any* prayer and any Azan time:
+_For any_ prayer and any Azan time:
+
 - If a FIXED override is active, the Iqama must equal the override's `value` field exactly, regardless of the Azan time.
 - If an OFFSET override is active, the Iqama must equal `CeilingToNearest5(Azan + offset_minutes)`.
 - The `has_overrides` field in `metadata` must be `true` if and only if at least one override was applied for that date.
@@ -528,7 +549,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 9: Single-date response contains all required fields and all time values are valid HH:mm strings
 
-*For any* valid `YYYY-MM-DD` date, the response object must contain: `date` (matching the input), `day_of_week` (a full English weekday name), `is_dst` (boolean), `fajr`, `dhuhr`, `asr`, `maghrib`, `isha` (each with `azan` and `iqama` fields), and `metadata` with `calculation_method` and `has_overrides`. Every `azan` and `iqama` value must match the pattern `/^\d{2}:\d{2}$/`.
+_For any_ valid `YYYY-MM-DD` date, the response object must contain: `date` (matching the input), `day_of_week` (a full English weekday name), `is_dst` (boolean), `fajr`, `dhuhr`, `asr`, `maghrib`, `isha` (each with `azan` and `iqama` fields), and `metadata` with `calculation_method` and `has_overrides`. Every `azan` and `iqama` value must match the pattern `/^\d{2}:\d{2}$/`.
 
 **Validates: Requirements 8.2, 9.1, 9.2, 9.3**
 
@@ -536,7 +557,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 10: Date-range response contains exactly the right number of entries
 
-*For any* valid `start_date` and `end_date` where `start_date <= end_date`, the response array must contain exactly `daysBetween(start_date, end_date) + 1` entries, and the `date` fields must form a contiguous, ascending sequence from `start_date` to `end_date`.
+_For any_ valid `start_date` and `end_date` where `start_date <= end_date`, the response array must contain exactly `daysBetween(start_date, end_date) + 1` entries, and the `date` fields must form a contiguous, ascending sequence from `start_date` to `end_date`.
 
 **Validates: Requirements 8.3**
 
@@ -544,7 +565,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 11: Monthly cache contains exactly one entry per day in the month
 
-*For any* year-month, when the cache is built, the stored array must contain exactly as many `DailySchedule` entries as there are calendar days in that month, and the `date` fields must cover every day from the 1st to the last day of the month.
+_For any_ year-month, when the cache is built, the stored array must contain exactly as many `DailySchedule` entries as there are calendar days in that month, and the `date` fields must cover every day from the 1st to the last day of the month.
 
 **Validates: Requirements 10.2**
 
@@ -552,7 +573,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 12: Cross-month Friday Block lookback is correct for the first days of a month
 
-*For any* month where the 1st day is not a Friday, the Fajr, Asr, and Isha Iqama for the first day(s) of the month must equal the Iqama values computed for the preceding Friday (which may fall in the prior calendar month).
+_For any_ month where the 1st day is not a Friday, the Fajr, Asr, and Isha Iqama for the first day(s) of the month must equal the Iqama values computed for the preceding Friday (which may fall in the prior calendar month).
 
 **Validates: Requirements 10.6**
 
@@ -560,7 +581,7 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 13: HH:mm formatting round-trip is identity
 
-*For any* `HH:mm` string in the range `[00:00, 23:59]`, parsing it to a `dayjs` object in the Masjid_Timezone and re-formatting it with `formatHHmm` must produce the identical `HH:mm` string.
+_For any_ `HH:mm` string in the range `[00:00, 23:59]`, parsing it to a `dayjs` object in the Masjid_Timezone and re-formatting it with `formatHHmm` must produce the identical `HH:mm` string.
 
 **Validates: Requirements 11.2**
 
@@ -568,7 +589,8 @@ The property-based testing library for this project is **[fast-check](https://gi
 
 ### Property 14: Rounding functions are pure and produce correct boundaries
 
-*For any* minute value in `[0, 59]`:
+_For any_ minute value in `[0, 59]`:
+
 - `ceilingToNearest5(m)` must return a value that is a multiple of 5, is `>= m`, and is the smallest such multiple.
 - `ceilingToNearest30(m)` must return a value that is a multiple of 30 (i.e., 0 or 30 within the hour), is `>= m`, and is the smallest such multiple.
 

@@ -86,7 +86,7 @@ The Iqama Engine takes astronomical prayer times from the `adhan` library and ap
 
 Each prayer uses its own astronomical time for maximum accuracy.
 
-For detailed rule specifications, see `.kiro/steering/prayer-rules-overview.md` (behaviour of the seed rules) and `.kiro/steering/iqama-rules-system.md` (how the rules are stored and evaluated).
+For how the rules are stored and evaluated, the fixed guardrails and the seed rules, see `.kiro/steering/iqama-rules-system.md`. The live times are the stored rules, edited in the admin.
 
 ### Admin-configurable rules (iqama rule engine)
 
@@ -454,8 +454,8 @@ GET /api/v1/health
 
 When modifying calculation rules:
 
-1. Read the rule documentation in `.kiro/steering/prayer-rules-overview.md`
-2. Understand the impact on the Friday Block mechanism
+1. Read `.kiro/steering/iqama-rules-system.md`
+2. Prefer changing the stored rules in the admin over changing code; a code change must keep the snapshot test green or regenerate it on purpose
 3. Test across all seasons (summer/winter extremes)
 4. Update property-based tests
 5. Document the change rationale

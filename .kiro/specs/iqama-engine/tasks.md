@@ -1,3 +1,5 @@
+> ARCHIVED: describes the original hard-coded rules (removed in PR #13). Superseded by .kiro/specs/iqama-rules-admin/. Kept for history; do not use as a guide to current behaviour.
+
 # Implementation Plan: iqama-engine
 
 ## Overview
@@ -43,12 +45,12 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
   - [x] 5.1 Create `src/rules/time-utils.ts` with `ceilingToNearest5`, `ceilingToNearest30`, and `formatHHmm`
     - Implement exactly as specified in the design (sub-minute seconds bump to next minute before rounding)
     - _Requirements: 11.1, 11.3, 11.4_
-  - [ ]* 5.2 Write property test for `ceilingToNearest5` and `ceilingToNearest30`
+  - [ ]\* 5.2 Write property test for `ceilingToNearest5` and `ceilingToNearest30`
     - **Property 14: Rounding functions are pure and produce correct boundaries**
     - For any minute value in `[0, 59]`, `ceilingToNearest5` returns a multiple of 5 that is `>= input` and is the smallest such multiple
     - For any minute value in `[0, 59]`, `ceilingToNearest30` returns 0 or 30 (within the hour), is `>= input`, and is the smallest such multiple
     - **Validates: Requirements 11.3, 11.4**
-  - [ ]* 5.3 Write property test for `formatHHmm` round-trip
+  - [ ]\* 5.3 Write property test for `formatHHmm` round-trip
     - **Property 13: HH:mm formatting round-trip is identity**
     - For any `HH:mm` string in `[00:00, 23:59]`, parse to dayjs and re-format — must produce the identical string
     - **Validates: Requirements 11.2**
@@ -57,10 +59,10 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
   - [x] 6.1 Create `src/rules/fr1-maghrib.rule.ts`
     - Implement `computeMaghribIqama(maghribAzan: Dayjs): string` → `formatHHmm(ceilingToNearest5(azan.add(5, 'minute')))`
     - _Requirements: 2.1, 2.2, 2.3_
-  - [ ]* 6.2 Write unit tests for FR1
+  - [ ]\* 6.2 Write unit tests for FR1
     - Test with a known Azan time (e.g., 20:31 → 20:40, 20:25 → 20:30)
     - _Requirements: 2.1_
-  - [ ]* 6.3 Write property test for FR1
+  - [ ]\* 6.3 Write property test for FR1
     - **Property 1: Maghrib Iqama formula holds for all Azan times**
     - For any valid Maghrib Azan (minutes since midnight in `[0, 1439]`), `iqama == ceilingToNearest5(azan + 5)`
     - **Validates: Requirements 2.1**
@@ -71,11 +73,11 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - DST detection: compare `dayjs.tz(date, tz).utcOffset()` against `dayjs.tz(date, tz).startOf('year').utcOffset()`
     - Return `"13:45"` if DST active, `"12:45"` otherwise
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
-  - [ ]* 7.2 Write unit tests for FR2
+  - [ ]\* 7.2 Write unit tests for FR2
     - Test a known DST date (e.g., July 1) → `13:45`
     - Test a known non-DST date (e.g., January 15) → `12:45`
     - _Requirements: 3.1, 3.2_
-  - [ ]* 7.3 Write property test for FR2
+  - [ ]\* 7.3 Write property test for FR2
     - **Property 2: DST flag is correct for all dates**
     - For any date in the Masjid_Timezone, `is_dst` must equal `true` iff UTC offset > UTC offset of Jan 1 of the same year
     - **Validates: Requirements 3.3**
@@ -87,12 +89,12 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - Apply floor clamp: if `baseTarget < fajrAzan + 10 min`, set `baseTarget = fajrAzan + 10 min`
     - Return `formatHHmm(ceilingToNearest5(baseTarget))`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-  - [ ]* 8.2 Write unit tests for FR3
+  - [ ]\* 8.2 Write unit tests for FR3
     - Test branch where `maxDelay` wins (short summer night)
     - Test branch where `safeSunriseLimit` wins (long winter night)
     - Test branch where floor clamp is applied (extreme edge case)
     - _Requirements: 4.1–4.5_
-  - [ ]* 8.3 Write property test for FR3
+  - [ ]\* 8.3 Write property test for FR3
     - **Property 3: Fajr Iqama satisfies the floor clamp and rounding invariants**
     - For any Fajr Azan and Sunrise time, `iqama >= azan + 10 min` AND `iqama minutes % 5 == 0`
     - **Validates: Requirements 4.4, 4.5**
@@ -101,10 +103,10 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
   - [x] 9.1 Create `src/rules/fr4-asr-isha.rule.ts` with `computeAsrIqama(asrAzan: Dayjs): string`
     - Compute `ceilingToNearest30(asrAzan + 15 min)` and format as HH:mm
     - _Requirements: 5.1_
-  - [ ]* 9.2 Write unit tests for Asr rule
+  - [ ]\* 9.2 Write unit tests for Asr rule
     - Test Azan at 15:10 → rounds to 15:30; Azan at 15:20 → rounds to 16:00
     - _Requirements: 5.1_
-  - [ ]* 9.3 Write property test for Asr rule
+  - [ ]\* 9.3 Write property test for Asr rule
     - **Property 4: Asr Iqama always lands on a :00 or :30 boundary**
     - For any Asr Azan, `iqama.minute() in [0, 30]` AND `iqama >= azan + 15 min`
     - **Validates: Requirements 5.1**
@@ -114,12 +116,12 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - Implement the three-branch gap interpolation: `> 22:30 → gap=5`, `< 20:00 → gap=15`, else linear interpolation
     - Return `formatHHmm(ceilingToNearest5(ishaAzan + gap))`
     - _Requirements: 5.2, 5.3, 5.4_
-  - [ ]* 10.2 Write unit tests for Isha rule
+  - [ ]\* 10.2 Write unit tests for Isha rule
     - Test Azan at 23:00 (after 22:30) → gap = 5
     - Test Azan at 19:30 (before 20:00) → gap = 15
     - Test Azan at 21:15 (interpolated midpoint) → gap ≈ 10
     - _Requirements: 5.2, 5.3, 5.4_
-  - [ ]* 10.3 Write property test for Isha rule
+  - [ ]\* 10.3 Write property test for Isha rule
     - **Property 5: Isha gap is always in [5, 15] minutes and output is rounded to nearest 5**
     - For any Isha Azan, gap ∈ [5, 15], gap decreases monotonically as Azan increases in [20:00, 22:30], and `iqama == ceilingToNearest5(azan + gap)`
     - **Validates: Requirements 5.2, 5.3, 5.4**
@@ -132,16 +134,16 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - `computeIqama(date: string, raw: RawPrayerTimes, fridayRaw?: RawPrayerTimes): IqamaTimes`
     - When `fridayRaw` is provided, pass it to FR3 and FR4 for Fajr, Asr, Isha; use `raw` for Maghrib and Dhuhr
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
-  - [ ]* 11.3 Write unit tests for Friday Block
+  - [ ]\* 11.3 Write unit tests for Friday Block
     - Test that a Saturday uses the preceding Friday's Fajr/Asr/Isha values
     - Test that a Friday uses its own values
     - Test that Maghrib and Dhuhr are always from the requested date
     - _Requirements: 6.1–6.5_
-  - [ ]* 11.4 Write property test for Friday Block — non-Friday dates
+  - [ ]\* 11.4 Write property test for Friday Block — non-Friday dates
     - **Property 6: Friday Block — non-Friday dates use the preceding Friday's Fajr, Asr, and Isha Iqama**
     - For any non-Friday date D, computed Fajr/Asr/Isha must equal values computed for the immediately preceding Friday
     - **Validates: Requirements 6.2, 6.3, 6.4**
-  - [ ]* 11.5 Write property test for Friday Block — Maghrib and Dhuhr independence
+  - [ ]\* 11.5 Write property test for Friday Block — Maghrib and Dhuhr independence
     - **Property 7: Maghrib and Dhuhr are never affected by the Friday Block**
     - For any non-Friday date D, Maghrib iqama = `ceilingToNearest5(D's Maghrib Azan + 5)` and Dhuhr iqama = DST-determined fixed value for D
     - **Validates: Requirements 2.2, 2.3, 3.5, 6.5**
@@ -159,13 +161,13 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - `OFFSET` override: return `formatHHmm(ceilingToNearest5(azan + offsetMinutes))`
     - Set `hasOverrides = true` when at least one override was applied
     - _Requirements: 7.2, 7.3, 7.4, 7.6_
-  - [ ]* 13.3 Write unit tests for OverrideService
+  - [ ]\* 13.3 Write unit tests for OverrideService
     - Test FIXED override returns exact value regardless of Azan
     - Test OFFSET override applies `ceilingToNearest5(azan + offset)`
     - Test no-override path falls through to rules engine
     - Test `has_overrides` flag is set correctly
     - _Requirements: 7.2, 7.3, 7.4, 7.6_
-  - [ ]* 13.4 Write property test for override logic
+  - [ ]\* 13.4 Write property test for override logic
     - **Property 8: FIXED override always replaces the Iqama; OFFSET override applies CeilingToNearest5; has_overrides reflects override application**
     - For any prayer and Azan time: FIXED → iqama equals override value exactly; OFFSET → iqama equals `ceilingToNearest5(azan + offset)`; `has_overrides` is true iff at least one override applied
     - **Validates: Requirements 7.2, 7.3, 7.6**
@@ -181,16 +183,16 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - Fetch overrides, apply FR6 → FR1–FR5, build `DailySchedule` objects
     - Ensure cross-month Friday Block lookback computes the prior month's Friday data correctly
     - _Requirements: 10.2, 10.6_
-  - [ ]* 14.3 Write unit tests for CacheService
+  - [ ]\* 14.3 Write unit tests for CacheService
     - Test cache hit path returns filtered results without rebuilding
     - Test cache miss path builds the full month and stores it
     - Test in-memory fallback activates when Redis is unavailable
     - _Requirements: 10.1, 10.3, 10.5_
-  - [ ]* 14.4 Write property test for monthly cache completeness
+  - [ ]\* 14.4 Write property test for monthly cache completeness
     - **Property 11: Monthly cache contains exactly one entry per day in the month**
     - For any year-month, the built array has exactly `daysInMonth` entries with `date` fields covering every day from 1st to last
     - **Validates: Requirements 10.2**
-  - [ ]* 14.5 Write property test for cross-month Friday Block lookback
+  - [ ]\* 14.5 Write property test for cross-month Friday Block lookback
     - **Property 12: Cross-month Friday Block lookback is correct for the first days of a month**
     - For any month where the 1st is not a Friday, Fajr/Asr/Isha for the first day(s) equal the values computed for the preceding Friday (which may be in the prior month)
     - **Validates: Requirements 10.6**
@@ -201,11 +203,11 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - Implement `getScheduleForRange(startDate: string, endDate: string): Promise<DailySchedule[]>`
     - Delegate to `CacheService.getOrBuildMonth`, then filter to the requested date(s)
     - _Requirements: 8.2, 8.3, 9.1, 9.2, 9.3_
-  - [ ]* 15.2 Write property test for single-date response shape
+  - [ ]\* 15.2 Write property test for single-date response shape
     - **Property 9: Single-date response contains all required fields and all time values are valid HH:mm strings**
     - For any valid `YYYY-MM-DD`, response has all required fields and every `azan`/`iqama` matches `/^\d{2}:\d{2}$/`
     - **Validates: Requirements 8.2, 9.1, 9.2, 9.3**
-  - [ ]* 15.3 Write property test for date-range response length
+  - [ ]\* 15.3 Write property test for date-range response length
     - **Property 10: Date-range response contains exactly the right number of entries**
     - For any valid `start_date <= end_date`, response array length equals `daysBetween + 1` and dates form a contiguous ascending sequence
     - **Validates: Requirements 8.3**
@@ -222,7 +224,7 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
   - [x] 16.3 Create `src/schedule/dto/daily-schedule.dto.ts` with the `DailySchedule` response interface/class
     - _Requirements: 9.1, 9.2, 9.3_
-  - [ ]* 16.4 Write unit tests for controller validation
+  - [ ]\* 16.4 Write unit tests for controller validation
     - Test all five 400 error cases with descriptive messages matching the design's error table
     - _Requirements: 8.4, 8.5, 8.6_
 
@@ -239,10 +241,10 @@ Build a NestJS REST API that computes Islamic congregation (Iqama) times by appl
   - [x] 18.3 Write integration tests for all 400 error cases
     - `date` + `start_date` → 400; missing params → 400; invalid format → 400; `start_date > end_date` → 400
     - _Requirements: 8.4, 8.5, 8.6_
-  - [ ]* 18.4 Write integration test: override records are reflected with `has_overrides: true`
+  - [ ]\* 18.4 Write integration test: override records are reflected with `has_overrides: true`
     - Seed a FIXED and an OFFSET override in the test database; verify response reflects them
     - _Requirements: 7.2, 7.3, 7.6_
-  - [ ]* 18.5 Write integration test: cache hit path is served from cache
+  - [ ]\* 18.5 Write integration test: cache hit path is served from cache
     - Mock Redis; make two requests for the same month; verify the build function is called only once
     - _Requirements: 10.1, 10.3_
 
