@@ -1,36 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
-const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const app_module_1 = require("./app.module");
+const app_setup_1 = require("./app.setup");
 const tzdata_guard_1 = require("./config/tzdata-guard");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     (0, tzdata_guard_1.warnIfStaleTzdata)(app.get(config_1.ConfigService).get('app.masjidTimezone') ?? '');
-    app.use((_req, res, next) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        next();
-    });
-    const rawOrigin = process.env.CORS_ORIGIN ?? '';
-    if (rawOrigin) {
-        const origins = rawOrigin
-            .split(',')
-            .map((o) => o.trim())
-            .filter(Boolean);
-        app.enableCors({
-            origin: origins.length === 1 && origins[0] === '*' ? '*' : origins,
-            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-            allowedHeaders: ['Content-Type', 'x-api-key', 'Cache-Control'],
-            credentials: false,
-        });
-    }
-    app.useGlobalPipes(new common_1.ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: false,
-    }));
+    (0, app_setup_1.configureApp)(app);
     await app.listen(process.env.PORT ?? 3000);
 }
 void bootstrap();

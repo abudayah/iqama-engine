@@ -8,12 +8,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var HealthController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HealthController = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-let HealthController = class HealthController {
+let HealthController = HealthController_1 = class HealthController {
     prisma;
+    logger = new common_1.Logger(HealthController_1.name);
     constructor(prisma) {
         this.prisma = prisma;
     }
@@ -30,15 +32,8 @@ let HealthController = class HealthController {
             };
         }
         catch (error) {
-            return {
-                status: 'degraded',
-                timestamp: new Date().toISOString(),
-                services: {
-                    database: 'down',
-                    api: 'up',
-                },
-                error: error instanceof Error ? error.message : 'Unknown error',
-            };
+            this.logger.error('Health check failed: database unreachable', error instanceof Error ? error.stack : String(error));
+            throw new common_1.ServiceUnavailableException({ status: 'error', db: 'down' });
         }
     }
 };
@@ -49,7 +44,7 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], HealthController.prototype, "check", null);
-exports.HealthController = HealthController = __decorate([
+exports.HealthController = HealthController = HealthController_1 = __decorate([
     (0, common_1.Controller)('api/v1/health'),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], HealthController);

@@ -16,6 +16,9 @@ const admin_module_1 = require("./admin/admin.module");
 const health_module_1 = require("./health/health.module");
 const hijri_calendar_module_1 = require("./hijri-calendar/hijri-calendar.module");
 const adhan_config_module_1 = require("./adhan-config/adhan-config.module");
+const core_1 = require("@nestjs/core");
+const throttler_1 = require("@nestjs/throttler");
+const throttle_config_1 = require("./throttle/throttle.config");
 const iqama_rules_module_1 = require("./iqama-rules/iqama-rules.module");
 const path_1 = require("path");
 let AppModule = class AppModule {
@@ -34,6 +37,7 @@ exports.AppModule = AppModule = __decorate([
                 ttl: 10 * 60 * 1000,
                 max: 100,
             }),
+            throttler_1.ThrottlerModule.forRoot(throttle_config_1.THROTTLER_OPTIONS),
             schedule_module_1.ScheduleModule,
             admin_module_1.AdminModule,
             health_module_1.HealthModule,
@@ -42,7 +46,7 @@ exports.AppModule = AppModule = __decorate([
             iqama_rules_module_1.IqamaRulesModule,
         ],
         controllers: [],
-        providers: [],
+        providers: [{ provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard }],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map
