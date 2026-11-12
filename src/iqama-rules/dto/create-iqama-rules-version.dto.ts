@@ -32,6 +32,11 @@ export class CreateIqamaRulesVersionDto {
   @IsBoolean()
   acknowledgeConflicts?: boolean;
 
+  /** Optional: the `requestHash` the preview returned; checked against the body. */
+  @IsOptional()
+  @IsString()
+  requestHash?: string;
+
   /** Token from POST /preview for exactly these settings and date. */
   @IsString()
   previewId: string;

@@ -40,6 +40,8 @@ describe('IqamaRulesService', () => {
     expect(cfg.versions).toHaveLength(1);
     expect(cfg.cutover).toBe('2026-11-13');
     expect(cfg.effective).toBeNull(); // before the cutover the legacy rules apply
+    expect(cfg.latest?.rules).toEqual(DEFAULT_RULE_SET);
+    expect(cfg.upcoming).toHaveLength(1); // v1 starts on the cutover, after today
     expect(cfg.today).toBe('2026-11-11');
     expect(cfg.defaultEffectiveFrom).toBe('2026-11-13');
   });
@@ -48,14 +50,16 @@ describe('IqamaRulesService', () => {
     jest.useRealTimers();
     freezeDate('2026-11-20T20:00:00Z');
     const ok = await makeStack({});
-    expect((await ok.service.getConfig()).effective).toEqual(DEFAULT_RULE_SET);
+    expect((await ok.service.getConfig()).effective?.rules).toEqual(
+      DEFAULT_RULE_SET,
+    );
 
     const bad = await makeStack({
       rows: [{ ...versionRow(1, '2026-11-13'), settings: '{nope' }],
     });
     const cfg = await bad.service.getConfig();
-    expect(cfg.effective).toBeNull();
-    expect(cfg.effectiveError).toMatch(/not valid JSON/);
+    expect(cfg.effective?.rules).toBeNull();
+    expect(cfg.effective?.error).toMatch(/not valid JSON/);
   });
 
   it('getCatalog exposes ranges and the fixed guardrails', async () => {
@@ -63,7 +67,13 @@ describe('IqamaRulesService', () => {
     const c = service.getCatalog();
     expect(c.guardrails.minGapAfterAzanMinutes).toBe(3);
     expect(c.guardrails.iqamaStepMinutes).toBe(5);
-    expect(c.modifiers.limits.latestBeforeSunrise.prayers).toEqual(['fajr']);
+    const limits = c.modifiers.find((m) => m.name === 'limits');
+    expect(
+      limits?.fields?.find((f) => f.name === 'latestBeforeSunrise'),
+    ).toMatchObject({ prayers: ['fajr'] });
+    expect(c.guardrails.fajrSunriseConflictPolicy).toBe(
+      'gap-wins-with-acknowledgement',
+    );
     expect(c.baseTypes.map((b) => b.type)).toEqual([
       'OFFSET',
       'FIXED_TIME',

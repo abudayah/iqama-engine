@@ -57,6 +57,14 @@ Fix Dhuhr after the end of clock changes, add hard guardrails, then move the Iqa
   - [x] 4c.5 Fajr conflict: `iqama_conflict`, preview `conflicts`, `acknowledgeConflicts`
   - _Requirements: 6, 8_
 
+- [x] 4d. Phase 6: engine contract for the UI review (commit `phase 6`)
+  - [x] 4d.1 `GET /` returns `effective`, `latest`, `upcoming[]`, `versions[]` with `createdAt` and `reason`
+  - [x] 4d.2 Preview echoes `effectiveFrom`, `currentRevision`, `requestHash`; `PUT /base` 422 `IQAMA_PREVIEW_INVALID` / `IQAMA_PREVIEW_MISMATCH` / `IQAMA_REVISION_STALE`
+  - [x] 4d.3 Test: a later version that changes only Isha keeps Asr from an existing future version
+  - [x] 4d.4 Catalog with structured field metadata (no range strings); `fajrSunriseConflictPolicy`
+  - [x] 4d.5 `iqama_conflict` on both the Fajr entry and the day; contract documented in the steering file
+  - _Requirements: 9_
+
 - [ ] 5. Production cutover (see runbook)
   - [ ] 5.1 Check the production Node/ICU timezone data (America/Vancouver in January 2027 must be UTC-7)
   - [ ] 5.2 Migrate and seed

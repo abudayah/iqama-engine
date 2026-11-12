@@ -17,6 +17,8 @@ export interface DailySchedule {
   hijri_date: string; // e.g., "Dhul Hijjah 25, 1446"
   day_of_week: string; // e.g. "Friday"
   is_dst: boolean;
+  /** Day-level flag: true when any prayer on this day has `iqama_conflict` (today only Fajr). */
+  iqama_conflict?: boolean;
   fajr: PrayerEntry;
   sunrise: string; // HH:mm
   dhuhr: PrayerEntry;

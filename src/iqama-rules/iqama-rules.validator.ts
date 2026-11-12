@@ -60,6 +60,13 @@ function validatePrayer(
         err('.base.points', 'at least 2 points are required');
         break;
       }
+      if (pts.length > RANGES.scaledGapMaxPoints) {
+        err(
+          '.base.points',
+          `at most ${RANGES.scaledGapMaxPoints} points are allowed`,
+        );
+        break;
+      }
       pts.forEach((p, i) => {
         if (!HHMM.test(p?.azan ?? ''))
           err(`.base.points[${i}].azan`, 'must be HH:mm');
@@ -83,8 +90,15 @@ function validatePrayer(
     }
     case 'SEASONAL': {
       const segs = b.segments;
-      if (!Array.isArray(segs) || segs.length < 1) {
+      if (!Array.isArray(segs) || segs.length < RANGES.seasonalMinSegments) {
         err('.base.segments', 'at least 1 segment is required');
+        break;
+      }
+      if (segs.length > RANGES.seasonalMaxSegments) {
+        err(
+          '.base.segments',
+          `at most ${RANGES.seasonalMaxSegments} segments are allowed`,
+        );
         break;
       }
       const seen = new Set<string>();

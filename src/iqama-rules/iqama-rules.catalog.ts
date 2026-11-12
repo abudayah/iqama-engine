@@ -14,9 +14,55 @@ export const RANGES = {
   weekdayAdjust: { min: -60, max: 60 },
   roundingSteps: [5, 10, 15, 30, 60], // multiples of IQAMA_STEP_MIN
   scaledGapMinPoints: 2,
+  scaledGapMaxPoints: 10,
+  seasonalMinSegments: 1,
+  seasonalMaxSegments: 24,
+  month: { min: 1, max: 12 },
+  dayOfMonth: { min: 1, max: 31 },
 } as const;
 
-/** Describes the rule model so the admin UI can render forms. */
+/**
+ * Field metadata, so the admin UI can render and validate forms from the
+ * catalog alone.
+ *
+ * Every field: { name, label, kind, required }.
+ *  kind 'int'    adds min, max, integer: true, optional step, default
+ *  kind 'time'   adds format: 'HH:mm'
+ *  kind 'enum'   adds options: [{ value, label }]
+ *  kind 'bool'   optional default
+ *  kind 'list'   adds minItems, maxItems and item: Field[] (the fields of one item)
+ *  kind 'object' adds fields: Field[]; a discriminated object also has
+ *                discriminator (the property name) and variants:
+ *                [{ value, label, fields: Field[] }] instead of fields
+ * Optional on any field: `prayers` (only these prayers may use it) and `default`
+ * (only where a default is safe; absent otherwise).
+ */
+const int = (
+  name: string,
+  label: string,
+  range: { min: number; max: number },
+  extra: Record<string, unknown> = {},
+) => ({
+  name,
+  label,
+  kind: 'int' as const,
+  required: true,
+  min: range.min,
+  max: range.max,
+  integer: true,
+  ...extra,
+});
+
+const time = (name: string, label: string) => ({
+  name,
+  label,
+  kind: 'time' as const,
+  required: true,
+  format: 'HH:mm',
+});
+
+const monthField = int('month', 'Month (1 = January)', RANGES.month);
+
 export const RULE_CATALOG = {
   prayers: PRAYER_NAMES.map((name) => ({
     name,
@@ -25,70 +71,161 @@ export const RULE_CATALOG = {
     fridayStartRequired: LOCKABLE_PRAYERS.includes(name),
     sunriseLimitAllowed: name === 'fajr',
   })),
+
+  /** The `base` object of a prayer rule: { type, ...fields }. */
   baseTypes: [
     {
       type: 'OFFSET',
       label: 'Minutes after Azan',
-      fields: [{ name: 'minutes', kind: 'int', ...RANGES.offsetMinutes }],
+      fields: [int('minutes', 'Minutes after Azan', RANGES.offsetMinutes)],
     },
     {
       type: 'FIXED_TIME',
       label: 'Fixed clock time',
-      fields: [{ name: 'time', kind: 'time', format: 'HH:mm' }],
+      fields: [time('time', 'Time')],
     },
     {
       type: 'SCALED_GAP',
       label: 'Gap that scales with Azan time',
+      note: 'Azan times must be strictly increasing; the gap is held flat before the first and after the last point.',
       fields: [
         {
           name: 'points',
-          kind: 'list',
+          label: 'Points',
+          kind: 'list' as const,
+          required: true,
           minItems: RANGES.scaledGapMinPoints,
+          maxItems: RANGES.scaledGapMaxPoints,
           item: [
-            { name: 'azan', kind: 'time', format: 'HH:mm' },
-            { name: 'gapMinutes', kind: 'int', ...RANGES.gapMinutes },
+            time('azan', 'When Azan is at'),
+            int('gapMinutes', 'Gap after Azan (minutes)', RANGES.gapMinutes),
           ],
-          note: 'Azan times must be strictly increasing; gap is held flat outside the points.',
         },
       ],
     },
     {
       type: 'SEASONAL',
       label: 'Seasonal fixed times',
+      note: 'Repeats every year; the last segment wraps over New Year. Start dates must be unique.',
       fields: [
         {
           name: 'segments',
-          kind: 'list',
-          minItems: 1,
+          label: 'Segments',
+          kind: 'list' as const,
+          required: true,
+          minItems: RANGES.seasonalMinSegments,
+          maxItems: RANGES.seasonalMaxSegments,
           item: [
             {
               name: 'start',
-              kind: 'oneOf',
-              options: [
-                { kind: 'DATE', fields: ['month (1-12)', 'day (1-31)'] },
-                { kind: 'FIRST_FRIDAY', fields: ['month (1-12)'] },
+              label: 'Starts on',
+              kind: 'object' as const,
+              required: true,
+              discriminator: 'kind',
+              variants: [
+                {
+                  value: 'DATE',
+                  label: 'A calendar date',
+                  fields: [
+                    monthField,
+                    int('day', 'Day of month', RANGES.dayOfMonth, {
+                      note: 'Must exist in the chosen month (February allows 29).',
+                    }),
+                  ],
+                },
+                {
+                  value: 'FIRST_FRIDAY',
+                  label: 'The first Friday of a month',
+                  fields: [monthField],
+                },
               ],
             },
-            { name: 'time', kind: 'time', format: 'HH:mm' },
+            time('time', 'Iqama time'),
           ],
-          note: 'Repeats every year; the last segment wraps over New Year.',
         },
       ],
     },
   ],
-  modifiers: {
-    order: ['limits', 'rounding', 'weekdayAdjust', 'weeklyLock'],
-    limits: {
-      minAfterAzan: RANGES.minAfterAzan,
-      latestBeforeSunrise: { ...RANGES.latestBeforeSunrise, prayers: ['fajr'] },
+
+  /** Optional parts of a prayer rule (keys of the rule object), in pipeline order. */
+  modifiers: [
+    {
+      name: 'limits',
+      label: 'Limits',
+      kind: 'object' as const,
+      required: false,
+      fields: [
+        {
+          ...int(
+            'minAfterAzan',
+            'At least this many minutes after Azan',
+            RANGES.minAfterAzan,
+          ),
+          required: false,
+        },
+        {
+          ...int(
+            'latestBeforeSunrise',
+            'At most this many minutes before sunrise',
+            RANGES.latestBeforeSunrise,
+          ),
+          required: false,
+          prayers: ['fajr'],
+        },
+      ],
     },
-    rounding: {
-      modes: ['CEIL', 'FLOOR', 'NEAREST'],
-      steps: RANGES.roundingSteps,
+    {
+      name: 'rounding',
+      label: 'Rounding',
+      kind: 'object' as const,
+      required: false,
+      fields: [
+        {
+          name: 'mode',
+          label: 'Direction',
+          kind: 'enum' as const,
+          required: true,
+          options: [
+            { value: 'CEIL', label: 'Round up' },
+            { value: 'FLOOR', label: 'Round down' },
+            { value: 'NEAREST', label: 'Round to nearest' },
+          ],
+        },
+        {
+          name: 'step',
+          label: 'To a multiple of (minutes)',
+          kind: 'enum' as const,
+          required: true,
+          options: RANGES.roundingSteps.map((v) => ({
+            value: v,
+            label: `${v} minutes`,
+          })),
+          default: IQAMA_STEP_MIN,
+        },
+      ],
     },
-    weekdayAdjust: { weekdays: WEEKDAYS, ...RANGES.weekdayAdjust },
-    weeklyLock: { prayers: LOCKABLE_PRAYERS },
-  },
+    {
+      name: 'weekdayAdjust',
+      label: 'Weekday adjustment',
+      kind: 'object' as const,
+      required: false,
+      note: 'Minutes added on that weekday, e.g. FRI -5. Leave a weekday empty for no change.',
+      fields: WEEKDAYS.map((day) => ({
+        ...int(day, day, RANGES.weekdayAdjust),
+        required: false,
+      })),
+    },
+    {
+      name: 'weeklyLock',
+      label: 'Hold for the Friday to Thursday week',
+      kind: 'bool' as const,
+      required: false,
+      default: false,
+      prayers: [...LOCKABLE_PRAYERS],
+    },
+  ],
+
+  /** Order in which the parts of a rule are applied; guardrails always last. */
   pipeline: [
     'base',
     'limits',
@@ -98,10 +235,17 @@ export const RULE_CATALOG = {
     'override',
     'guardrails',
   ],
+
   /** Hard constants in code; not editable. */
   guardrails: {
     minGapAfterAzanMinutes: MIN_IQAMA_GAP_MIN,
     fajrEndsBeforeSunriseMinutes: FAJR_SUNRISE_BUFFER_MIN,
     iqamaStepMinutes: IQAMA_STEP_MIN,
+    /**
+     * When Azan + the minimum gap makes the Fajr sunrise rule impossible, the
+     * gap wins, the day is flagged (iqama_conflict) and the admin must
+     * acknowledge the conflicts before saving.
+     */
+    fajrSunriseConflictPolicy: 'gap-wins-with-acknowledgement',
   },
 } as const;

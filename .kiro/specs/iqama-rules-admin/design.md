@@ -54,13 +54,22 @@ Azan + sunrise (config-resolved)
 
 ## API
 
-`GET /` → `{ mode, currentRevision, versions, effective, today, timezone, defaultEffectiveFrom }`
+`GET /` → `{ mode, cutover, currentRevision, today, timezone, defaultEffectiveFrom, effective, latest, upcoming[], versions[] }` (see UI Contract)
 
 `GET /catalog` → base types with fields and ranges, modifiers, pipeline, prayers (`weeklyLockAllowed`, `fridayStartRequired`, `sunriseLimitAllowed`), guardrails.
 
 `POST /preview` `{ settings: string, effectiveFrom? }` → `{ previewId, currentRevision, effectiveFrom, warnings, days[14], summary }` where `summary = { from, to, totalDays, daysChanged, daysClamped, daysClampedCurrent, firstChangedDates, firstClampedDates, byPrayer }`.
 
-`PUT /base` `{ settings: string, effectiveFrom?, previewId, expectedRevision }` → the created version.
+`PUT /base` `{ settings: string, effectiveFrom?, previewId, expectedRevision, reason?, acknowledgeConflicts?, requestHash? }` → the created version.
+
+## UI Contract
+
+The exact request/response shapes, field metadata and error codes the admin UI relies on are in `.kiro/steering/iqama-rules-system.md`, section "UI contract (exact shapes)". Decisions behind it:
+
+- **Baseline is the newest version.** `GET /` returns `latest` (full rules, `versionId`, `effectiveFrom`, `createdAt`, `reason`), `effective` (in force today) and `upcoming[]`. A new version is built from `latest.rules`. The engine already rejects an `effectiveFrom` earlier than the newest version.
+- **Preview binds to the request.** The token is tied to a `requestHash` (SHA-256 of the canonical RuleSet and `effectiveFrom`) and to the revision. `PUT /base` answers 422 `IQAMA_PREVIEW_MISMATCH` / `IQAMA_REVISION_STALE` / `IQAMA_PREVIEW_INVALID`; a stale `expectedRevision` stays 409.
+- **Catalog carries field metadata** (`kind`, `required`, `min`, `max`, `integer`, `minItems`, `maxItems`, structured `options`, discriminated `variants`), so forms and validation need no hard-coded ranges. `default` exists only where safe. The `guardrails` block includes `fajrSunriseConflictPolicy: 'gap-wins-with-acknowledgement'`.
+- **`iqama_conflict` is set on both the Fajr entry and the day**, so the day-level and prayer-level readings agree.
 
 ## Testing Strategy
 

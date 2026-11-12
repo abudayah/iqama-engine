@@ -40,6 +40,20 @@ const addDays = (date: string, n: number): string => {
   return d.toISOString().slice(0, 10);
 };
 
+/** JSON with object keys sorted at every level (stable for hashing). */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .filter((k) => o[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 /** First Friday strictly after `today`. */
 export function nextFriday(today: string): string {
   const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
@@ -50,7 +64,12 @@ export function nextFriday(today: string): string {
 export class IqamaRulesService {
   private readonly previewTokens = new Map<
     string,
-    { hash: string; expiresAt: number; conflictCount: number }
+    {
+      requestHash: string;
+      revision: number;
+      expiresAt: number;
+      conflictCount: number;
+    }
   >();
   private readonly timezone: string;
 
@@ -83,16 +102,25 @@ export class IqamaRulesService {
 
   // ── preview tokens (same scheme as adhan-config) ───────────────────────────
 
-  private tokenHash(settings: string, effectiveFrom: string, revision: number) {
+  /**
+   * Hash of the exact request: canonical RuleSet (keys sorted, so formatting and
+   * key order do not matter) + effectiveFrom. The preview token is bound to it.
+   */
+  private requestHash(rules: RuleSet, effectiveFrom: string): string {
     return createHash('sha256')
-      .update(`${settings}|${effectiveFrom}|${revision}`)
+      .update(`${canonicalJson(rules)}|${effectiveFrom}`)
       .digest('hex');
   }
 
-  private issuePreviewId(hash: string, conflictCount: number): string {
+  private issuePreviewId(
+    requestHash: string,
+    revision: number,
+    conflictCount: number,
+  ): string {
     const id = `ipv_${randomBytes(8).toString('hex')}`;
     this.previewTokens.set(id, {
-      hash,
+      requestHash,
+      revision,
       expiresAt: Date.now() + PREVIEW_TTL_MS,
       conflictCount,
     });
@@ -102,30 +130,49 @@ export class IqamaRulesService {
     return id;
   }
 
+  /**
+   * The token is valid only for the exact request hash and revision it was
+   * issued for. Single use. Errors are 422 with a `code`:
+   *  IQAMA_PREVIEW_INVALID    missing, expired or already used
+   *  IQAMA_PREVIEW_MISMATCH   settings/effectiveFrom differ from the preview
+   *  IQAMA_REVISION_STALE     previewed against another revision than the one being saved on
+   *  IQAMA_CONFLICTS_NOT_ACKNOWLEDGED  Fajr conflicts listed, acknowledgeConflicts missing
+   */
   private consumePreviewId(
     id: string,
-    hash: string,
+    requestHash: string,
+    revision: number,
     acknowledgeConflicts: boolean,
   ): void {
+    const fail = (code: string, message: string, extra = {}) =>
+      new UnprocessableEntityException({ code, message, ...extra });
     const token = this.previewTokens.get(id);
     if (!token || token.expiresAt < Date.now()) {
       this.previewTokens.delete(id);
-      throw new UnprocessableEntityException(
-        'Preview token not found or expired. Please run the preview again.',
+      throw fail(
+        'IQAMA_PREVIEW_INVALID',
+        'Preview token not found, expired or already used. Please run the preview again.',
       );
     }
-    if (token.hash !== hash) {
-      throw new UnprocessableEntityException(
-        'Preview token does not match submitted settings. Please run the preview again.',
+    if (token.requestHash !== requestHash) {
+      throw fail(
+        'IQAMA_PREVIEW_MISMATCH',
+        'The rules or effective date differ from the ones that were previewed. Please run the preview again.',
+      );
+    }
+    if (token.revision !== revision) {
+      throw fail(
+        'IQAMA_REVISION_STALE',
+        `The preview was made against revision ${token.revision}, but this save is for revision ${revision}. Please reload and run the preview again.`,
       );
     }
     // Checked before the token is used up, so the admin can retry with the flag.
     if (token.conflictCount > 0 && !acknowledgeConflicts) {
-      throw new UnprocessableEntityException({
-        message: `This proposal has ${token.conflictCount} day(s) where Fajr cannot end 60 minutes before sunrise (Azan + 3 minutes wins). Review the conflicts in the preview and send acknowledgeConflicts: true to save.`,
-        code: 'IQAMA_CONFLICTS_NOT_ACKNOWLEDGED',
-        conflictCount: token.conflictCount,
-      });
+      throw fail(
+        'IQAMA_CONFLICTS_NOT_ACKNOWLEDGED',
+        `This proposal has ${token.conflictCount} day(s) where Fajr cannot end 60 minutes before sunrise (Azan + 3 minutes wins). Review the conflicts in the preview and send acknowledgeConflicts: true to save.`,
+        { conflictCount: token.conflictCount },
+      );
     }
     this.previewTokens.delete(id);
   }
@@ -173,37 +220,79 @@ export class IqamaRulesService {
         warnings: result.warnings,
       });
     }
-    return { rules, effectiveFrom, warnings: result.warnings, versions };
+    return {
+      rules,
+      effectiveFrom,
+      warnings: result.warnings,
+      versions,
+      requestHash: this.requestHash(rules, effectiveFrom),
+    };
   }
 
   // ── GET / ──────────────────────────────────────────────────────────────────
 
   async getConfig() {
     const today = this.today();
+    const cutover = parseCutover(
+      this.configService.get('app.iqamaRulesCutover'),
+    );
     const [versions, currentRevision] = await Promise.all([
       this.allVersions(),
       this.latestVersionId(),
     ]);
-    let effective: RuleSet | null = null;
-    let effectiveError: string | null = null;
-    const row = resolveRuleVersion(today, versions);
-    if (row) {
+
+    const describe = (row: IqamaRuleVersionRecord) => {
+      let rules: RuleSet | null = null;
+      let error: string | null = null;
       try {
-        effective = loadRuleSet(row);
+        rules = loadRuleSet(row);
       } catch (e) {
-        effectiveError = e instanceof Error ? e.message : String(e);
+        error = e instanceof Error ? e.message : String(e);
       }
-    }
+      return {
+        versionId: row.id,
+        effectiveFrom: row.effectiveFrom,
+        createdAt: row.createdAt,
+        reason: row.reason ?? null,
+        rules,
+        error,
+      };
+    };
+
+    // In force today. Before the cutover the legacy rules apply, so none.
+    const effectiveRow =
+      today < cutover ? undefined : resolveRuleVersion(today, versions);
+    // The baseline every new version must be built on (the newest one).
+    const latestRow = [...versions]
+      .sort(
+        (a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom) || a.id - b.id,
+      )
+      .at(-1);
+
     return {
       mode: parseIqamaRulesMode(this.configService.get('app.iqamaRules')),
+      cutover,
       currentRevision,
-      versions,
-      effective,
-      effectiveError,
-      cutover: parseCutover(this.configService.get('app.iqamaRulesCutover')),
       today,
       timezone: this.timezone,
       defaultEffectiveFrom: nextFriday(today),
+      effective: effectiveRow ? describe(effectiveRow) : null,
+      latest: latestRow ? describe(latestRow) : null,
+      upcoming: versions
+        .filter((v) => v.effectiveFrom > today)
+        .sort(
+          (a, b) =>
+            a.effectiveFrom.localeCompare(b.effectiveFrom) || a.id - b.id,
+        )
+        .map(describe),
+      versions: versions.map((v) => ({
+        id: v.id,
+        effectiveFrom: v.effectiveFrom,
+        createdAt: v.createdAt,
+        createdBy: v.createdBy,
+        reason: v.reason ?? null,
+        settings: v.settings,
+      })),
     };
   }
 
@@ -216,10 +305,8 @@ export class IqamaRulesService {
   // ── POST /preview ──────────────────────────────────────────────────────────
 
   async preview(dto: PreviewIqamaRulesDto) {
-    const { effectiveFrom, warnings, versions } = await this.validateDraft(
-      dto.settings,
-      dto.effectiveFrom,
-    );
+    const { effectiveFrom, warnings, versions, requestHash } =
+      await this.validateDraft(dto.settings, dto.effectiveFrom);
     const currentRevision = await this.latestVersionId();
 
     const proposedRecord: IqamaRuleVersionRecord = {
@@ -314,11 +401,13 @@ export class IqamaRulesService {
 
     return {
       previewId: this.issuePreviewId(
-        this.tokenHash(dto.settings, effectiveFrom, currentRevision),
+        requestHash,
+        currentRevision,
         conflictDays,
       ),
       currentRevision,
       effectiveFrom,
+      requestHash,
       warnings,
       conflicts,
       days: days.slice(0, SAMPLE_DAYS),
@@ -346,13 +435,22 @@ export class IqamaRulesService {
         `Rules changed since you opened this page (expected revision ${dto.expectedRevision}, current is ${currentRevision}). Please reload and review the latest values.`,
       );
     }
-    const { effectiveFrom } = await this.validateDraft(
+    const { effectiveFrom, requestHash } = await this.validateDraft(
       dto.settings,
       dto.effectiveFrom,
     );
+    // Optional echo from the client: must be the hash the preview returned.
+    if (dto.requestHash !== undefined && dto.requestHash !== requestHash) {
+      throw new UnprocessableEntityException({
+        code: 'IQAMA_PREVIEW_MISMATCH',
+        message:
+          'requestHash does not match the submitted settings and effectiveFrom. Please run the preview again.',
+      });
+    }
     this.consumePreviewId(
       dto.previewId,
-      this.tokenHash(dto.settings, effectiveFrom, dto.expectedRevision),
+      requestHash,
+      dto.expectedRevision,
       dto.acknowledgeConflicts === true,
     );
 

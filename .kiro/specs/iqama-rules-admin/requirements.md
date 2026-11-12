@@ -102,6 +102,17 @@ This document covers the engine. The admin UI lives in the `iqama-ui` repository
 4. WHEN Azan + 3 minutes makes the Fajr 60-minutes-before-sunrise rule impossible, THE gap SHALL win and the schedule entry SHALL carry `iqama_conflict: true`.
 5. `POST /preview` SHALL list such days in `conflicts`; `PUT /base` SHALL require `acknowledgeConflicts: true` when there are any (422 otherwise).
 
+### Requirement 9: Contract for the admin UI
+
+#### Acceptance Criteria
+
+1. `GET /` SHALL return `currentRevision`, `effective` (in force today), `latest` (the newest version with its full rules, `versionId`, `effectiveFrom`, `createdAt`, `reason`), `upcoming[]` (versions starting after today) and `versions[]` with `createdAt` and `reason`.
+2. A new version SHALL be built from `latest`; a date earlier than the newest version SHALL be rejected.
+3. `POST /preview` SHALL echo `effectiveFrom`, `currentRevision` and a `requestHash` of the canonical RuleSet and `effectiveFrom`; the preview token SHALL be valid only for that hash and revision, once.
+4. `PUT /base` SHALL answer 422 with a `code` for a token that is missing/used/expired (`IQAMA_PREVIEW_INVALID`), whose hash does not match the body (`IQAMA_PREVIEW_MISMATCH`), or whose revision is not the one being saved on (`IQAMA_REVISION_STALE`); a stale `expectedRevision` SHALL stay 409.
+5. `GET /catalog` SHALL describe every field of every base type and modifier with `name`, `label`, `kind`, `required` and, as applicable, `min`, `max`, `integer`, `minItems`, `maxItems`, structured `options` or `variants`, and `default` only where safe; it SHALL contain no human-readable range strings, and the `guardrails` block SHALL include `fajrSunriseConflictPolicy`.
+6. `iqama_conflict: true` SHALL be set on the Fajr entry and on the day object together.
+
 ### Requirement 7: Known effect on Asr
 
 #### Acceptance Criteria

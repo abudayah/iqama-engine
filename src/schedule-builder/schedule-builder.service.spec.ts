@@ -180,6 +180,7 @@ describe('ScheduleBuilderService', () => {
       // sunrise 06:30 - 60 = 05:30 but Azan 05:45 + 3 -> first mark 05:50
       expect(day.fajr.iqama).toBe('05:50');
       expect(day.fajr.iqama_conflict).toBe(true);
+      expect(day.iqama_conflict).toBe(true); // day-level flag too
       expect(day.dhuhr.iqama_conflict).toBeUndefined();
     });
 

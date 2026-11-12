@@ -360,6 +360,7 @@ export class ScheduleBuilderService {
         hijri_date: hijriDate,
         day_of_week: dateDayjs.format('dddd'),
         is_dst: isDstActive(date, tz),
+        ...(fajrConflict ? { iqama_conflict: true } : {}),
         fajr: {
           azan: formatHHmm(raw.fajr),
           iqama: finalIqama.fajr,

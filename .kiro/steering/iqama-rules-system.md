@@ -71,20 +71,85 @@ Overrides and guardrails apply in all three modes. Before the cutover every mode
 
 ## Admin API — `/api/v1/admin/iqama-rules` (header `X-API-Key`, same guard as adhan-config)
 
-| Method | Path       | Purpose                                                                                                                               |
-| ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/`        | mode, current revision, all versions, rules effective today, default `effectiveFrom`                                                  |
-| GET    | `/catalog` | rule types, fields, ranges, fixed guardrails (for the UI to render forms)                                                             |
-| POST   | `/preview` | real days current vs proposed (14 sample days) + 365-day summary (days changed/clamped, first dates, per prayer); returns `previewId` |
-| PUT    | `/base`    | save a new version. Needs `previewId` and `expectedRevision`. Default `effectiveFrom` = next Friday strictly after today              |
+| Method | Path       | Purpose                                                                                                                                |
+| ------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/`        | mode, cutover, current revision, `effective` (today), `latest` (the baseline), `upcoming[]`, all `versions[]`, default `effectiveFrom` |
+| GET    | `/catalog` | rule types, fields, ranges, fixed guardrails (for the UI to render forms)                                                              |
+| POST   | `/preview` | real days current vs proposed (14 sample days) + 365-day summary (days changed/clamped, first dates, per prayer); returns `previewId`  |
+| PUT    | `/base`    | save a new version. Needs `previewId` and `expectedRevision`. Default `effectiveFrom` = next Friday strictly after today               |
 
-Save rules: 400 for invalid JSON/rules, a past date, a date earlier than the latest version, or a non-Friday start for a changed Fajr/Dhuhr/Asr/Isha. 409 for a stale `expectedRevision`. 422 for a missing, expired, reused or mismatched preview token, and 422 `IQAMA_CONFLICTS_NOT_ACKNOWLEDGED` when the preview listed Fajr conflicts and `acknowledgeConflicts: true` was not sent (the token is kept, so the admin can retry). Optional `reason` (string, max 500) is stored with the version and returned in `GET` versions. There is no `who` field: the admin password is shared. Versions are append-only. Saving invalidates the schedule cache.
+Save rules: 400 for invalid JSON/rules, a past date, a date earlier than the latest version, or a non-Friday start for a changed Fajr/Dhuhr/Asr/Isha. 409 for a stale `expectedRevision`. 422 with a `code` for a bad preview token (`IQAMA_PREVIEW_INVALID`, `IQAMA_PREVIEW_MISMATCH`, `IQAMA_REVISION_STALE`), and 422 `IQAMA_CONFLICTS_NOT_ACKNOWLEDGED` when the preview listed Fajr conflicts and `acknowledgeConflicts: true` was not sent (the token is kept, so the admin can retry). Optional `reason` (string, max 500) is stored with the version and returned in `GET` versions. There is no `who` field: the admin password is shared. Versions are append-only. Saving invalidates the schedule cache.
 
-## Schedule response
+## Schedule response (see also the UI contract below)
 
 `iqama_clamped?: boolean` is added (only when true) on each prayer entry (`fajr`, `dhuhr`, `asr`, `maghrib`, `isha`) when a guardrail changed the Iqama.
 
-`iqama_conflict?: boolean` is added (only when true) on `fajr` when Azan + 3 minutes forces Fajr to end less than 60 minutes before sunrise. The gap wins, as before, but the day is flagged. `POST /preview` returns these days in `conflicts` (`date`, `prayer`, `azan`, `sunrise`, `iqama`, `brokenLimit`, `wonBy`; up to 100, total in `summary.conflictDays`), and `PUT /base` needs `acknowledgeConflicts: true` when there are any.
+`iqama_conflict?: boolean` is added (only when true) on `fajr` AND on the day object when Azan + 3 minutes forces Fajr to end less than 60 minutes before sunrise. The gap wins, as before, but the day is flagged. `POST /preview` returns these days in `conflicts` (`date`, `prayer`, `azan`, `sunrise`, `iqama`, `brokenLimit`, `wonBy`; up to 100, total in `summary.conflictDays`), and `PUT /base` needs `acknowledgeConflicts: true` when there are any.
+
+## UI contract (exact shapes)
+
+Everything the admin UI may rely on. Dates are `YYYY-MM-DD`; times are `HH:mm`; `RuleSet` = `{ fajr, dhuhr, asr, maghrib, isha }`, each a `PrayerRule` (`base`, optional `limits`, `rounding`, `weekdayAdjust`, `weeklyLock`). Auth for all `/api/v1/admin/*` routes: header `x-api-key`.
+
+**RuleSet serialization.** `settings` is a **JSON string** of the RuleSet in preview and save (`JSON.stringify(ruleSet)`). Key order and whitespace do not matter: the server hashes a canonical form (keys sorted).
+
+**Baseline.** A new version must be built from `latest.rules` (the NEWEST version), never from `effective`. The engine rejects an `effectiveFrom` earlier than the newest version's date (400), so a version cannot be slipped in before a scheduled one. It cannot know what the UI meant to keep: a proposal built from `effective` would silently revert changes scheduled in an upcoming version; the preview would show it, nothing else stops it.
+
+`GET /api/v1/admin/iqama-rules`
+
+```
+{ mode: 'legacy'|'shadow'|'db', cutover, currentRevision, today, timezone, defaultEffectiveFrom,
+  effective: V | null,          // in force today; null before the cutover (legacy rules apply) or if no version
+  latest:    V | null,          // the newest version = baseline; currentRevision === latest.versionId
+  upcoming:  V[],               // versions with effectiveFrom > today, oldest first
+  versions:  [{ id, effectiveFrom, createdAt, createdBy, reason, settings }] }   // all, oldest first
+V = { versionId, effectiveFrom, createdAt, reason: string|null, rules: RuleSet|null, error: string|null }
+```
+
+`rules` is null and `error` set only if the stored JSON fails validation. `createdBy` is always `"admin"` (shared password), so the UI should not show it.
+
+`GET /api/v1/admin/iqama-rules/catalog` returns `{ prayers, baseTypes, modifiers, pipeline, guardrails }`:
+
+- `prayers[]`: `{ name, weeklyLockAllowed, fridayStartRequired, sunriseLimitAllowed }`
+- `baseTypes[]`: `{ type, label, note?, fields: Field[] }` for `OFFSET`, `FIXED_TIME`, `SCALED_GAP`, `SEASONAL`
+- `modifiers[]`: Field objects for `limits`, `rounding`, `weekdayAdjust`, `weeklyLock` (keys of the prayer rule)
+- `guardrails`: `{ minGapAfterAzanMinutes: 3, fajrEndsBeforeSunriseMinutes: 60, iqamaStepMinutes: 5, fajrSunriseConflictPolicy: 'gap-wins-with-acknowledgement' }`
+- `Field`: `{ name, label, kind: 'int'|'time'|'enum'|'list'|'object'|'bool', required, prayers?, default?, note? }` plus by kind: `int`: `min, max, integer: true`; `time`: `format: 'HH:mm'`; `enum`: `options: [{ value, label }]`; `list`: `minItems, maxItems, item: Field[]` (the fields of one item); `object`: `fields: Field[]`, or `discriminator` + `variants: [{ value, label, fields }]` (the Seasonal `start`: discriminator `kind`, variants `DATE` and `FIRST_FRIDAY`). `default` appears only where it is safe (`weeklyLock` false, rounding `step` 5); everything else has none and must be entered. The validator uses the same ranges (`RANGES` in `iqama-rules.catalog.ts`).
+
+`POST /api/v1/admin/iqama-rules/preview` body `{ settings: string, effectiveFrom?: string }` (default: next Friday after today) →
+
+```
+{ previewId, effectiveFrom, currentRevision, requestHash, warnings: Issue[],
+  conflicts: [{ date, prayer: 'fajr', azan, sunrise, iqama, brokenLimit, wonBy }],   // up to 100
+  days: [{ date, day_of_week, prayers: { fajr|dhuhr|asr|maghrib|isha: { azan, current: { iqama, clamped }, proposed: { iqama, clamped } } } }],  // 14 days
+  summary: { from, to, totalDays, daysChanged, daysClamped, daysClampedCurrent, conflictDays,
+             firstChangedDates, firstClampedDates, byPrayer: { <prayer>: { daysChanged, daysClamped } } } }
+Issue = { path, message }
+```
+
+`requestHash` = SHA-256 of (canonical RuleSet + `|` + `effectiveFrom`). The token `previewId` is valid for 10 minutes, once, and only for that hash and that `currentRevision`.
+
+`PUT /api/v1/admin/iqama-rules/base` body `{ settings, effectiveFrom?, previewId, expectedRevision, reason?: string (max 500), acknowledgeConflicts?: boolean, requestHash?: string }` → the created row `{ id, effectiveFrom, settings, reason, createdBy, createdAt }`. Sending `requestHash` (from the preview) is optional and is checked against the body.
+
+Errors (all JSON bodies carry `message`):
+
+| Status | When                                                                                                                                                            | Body                                                                                 |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 400    | invalid JSON, past date, date earlier than the newest version, rule validation failed (including a non-Friday `effectiveFrom` when Fajr/Dhuhr/Asr/Isha changes) | `{ message, errors: [{ path, message }], warnings }`, e.g. path `fajr.effectiveFrom` |
+| 409    | `expectedRevision` is not the current revision                                                                                                                  | `{ message }` (reload and preview again)                                             |
+| 422    | `IQAMA_PREVIEW_INVALID` missing, expired or already used token                                                                                                  | `{ code, message }`                                                                  |
+| 422    | `IQAMA_PREVIEW_MISMATCH` settings, `effectiveFrom` or `requestHash` differ from the preview                                                                     | `{ code, message }`                                                                  |
+| 422    | `IQAMA_REVISION_STALE` the preview was made against another revision than `expectedRevision`                                                                    | `{ code, message }`                                                                  |
+| 422    | `IQAMA_CONFLICTS_NOT_ACKNOWLEDGED` the preview listed Fajr conflicts and `acknowledgeConflicts` is not `true` (token kept, retry allowed)                       | `{ code, message, conflictCount }`                                                   |
+
+After any 422 the UI must discard the preview and ask for a new one.
+
+**Override endpoints.** `POST /api/v1/admin/overrides` and `PATCH /api/v1/admin/overrides/:id` return 409 `{ message }` (naming the clashing override: id, prayer, type, value, dates) when the dates overlap an active override for the SAME prayer. Where overrides are already stored with overlaps, the newest one wins.
+
+**Schedule fields** (`GET /api/v1/schedule`):
+
+- `iqama_clamped: true` on a prayer entry when a guardrail changed that prayer's time (any prayer, any path).
+- `iqama_conflict: true` is set at **both** levels, always together: on the prayer entry (`fajr` only today) and on the day object (the day has at least one prayer with a conflict). Read the prayer-level flag to say which prayer; the day-level flag is for calendar-style views. A conflict day usually also has `iqama_clamped` on Fajr, because the gap moved it.
+- A conflict never makes the engine fail: the gap after Azan wins, the day is flagged, and the admin acknowledged it when saving.
 
 ## Operations
 
