@@ -250,7 +250,7 @@ X-API-Key: your-admin-api-key
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 22.23.5 or newer (see `.nvmrc`) and npm. Older builds have old timezone data and get B.C. winter time wrong
 
 ### Setup
 

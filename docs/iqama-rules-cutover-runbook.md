@@ -18,7 +18,7 @@ Expected: both lines show `MST` (UTC-7). In the January line, `PST` means the da
 
 If it shows `PST` in January:
 
-1. Update Node to a release that bundles tzdata with the B.C. change, or install a newer ICU data package. Check the Node release notes for the tzdata version.
+1. Update Node to 22.23.5 or newer (tzdata 2026e; see `.nvmrc` and `engines` in `package.json`). The app also logs `Stale timezone data` at startup if America/Vancouver is not UTC-7 in January of next year.
 2. Re-run the command above until January shows `MST`.
 3. Do not continue until it does. (Setting `MASJID_TIMEZONE=Etc/GMT+7` in `.env` also gives UTC-7 year-round and is a valid stopgap; it changes how the host formats times, so check the schedule output after.)
 
