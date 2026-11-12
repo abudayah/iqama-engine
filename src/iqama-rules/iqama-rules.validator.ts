@@ -4,6 +4,7 @@ import {
   toMin,
 } from '../rules/iqama-guardrail';
 import { RANGES } from './iqama-rules.catalog';
+import { canonicalJson } from './iqama-rules.canonical';
 import {
   LOCKABLE_PRAYERS,
   PRAYER_NAMES,
@@ -240,7 +241,7 @@ export function validateRuleSet(
       LOCKABLE_PRAYERS.includes(prayer) &&
       new Date(`${effectiveFrom}T00:00:00Z`).getUTCDay() !== 5 &&
       (!previous ||
-        JSON.stringify(previous[prayer]) !== JSON.stringify(rules?.[prayer]))
+        canonicalJson(previous[prayer]) !== canonicalJson(rules?.[prayer]))
     ) {
       errors.push({
         path: `${prayer}.effectiveFrom`,

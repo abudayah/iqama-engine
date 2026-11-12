@@ -87,6 +87,23 @@ describe('validateRuleSet', () => {
     ).toEqual(['fajr.effectiveFrom']);
   });
 
+  it('does not count a prayer as changed just because its keys are in another order', () => {
+    // Same RuleSet, keys sorted the way a client may serialise it.
+    const sorted = JSON.parse(
+      JSON.stringify(DEFAULT_RULE_SET, (_k, v: unknown) =>
+        v && typeof v === 'object' && !Array.isArray(v)
+          ? Object.fromEntries(
+              Object.entries(v).sort(([a], [b]) => a.localeCompare(b)),
+            )
+          : v,
+      ),
+    ) as RuleSet;
+    sorted.maghrib.base = { type: 'OFFSET', minutes: 10 };
+    expect(
+      validateRuleSet(sorted, '2026-11-04', DEFAULT_RULE_SET).errors,
+    ).toEqual([]);
+  });
+
   it('warns when limits are below the hard guardrails', () => {
     const r = clone();
     r.fajr.limits = { minAfterAzan: 1, latestBeforeSunrise: 30 };

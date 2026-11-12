@@ -122,9 +122,22 @@ V = { versionId, effectiveFrom, createdAt, reason: string|null, rules: RuleSet|n
   conflicts: [{ date, prayer: 'fajr', azan, sunrise, iqama, brokenLimit, wonBy }],   // up to 100
   days: [{ date, day_of_week, prayers: { fajr|dhuhr|asr|maghrib|isha: { azan, current: { iqama, clamped }, proposed: { iqama, clamped } } } }],  // 14 days
   summary: { from, to, totalDays, daysChanged, daysClamped, daysClampedCurrent, conflictDays,
-             firstChangedDates, firstClampedDates, byPrayer: { <prayer>: { daysChanged, daysClamped } } } }
+             firstChangedDates, firstClampedDates,
+             ...Moved,                                   // totals: days where at least one prayer matches
+             byPrayer: { <prayer>: { daysChanged, daysClamped, ...Moved } } } }
+Moved = { changedDays, movedNow, movedProposed, newlyMoved, newlyMovedDates: string[] (first 10), noLongerMoved }
 Issue = { path, message }
 ```
+
+"Moved" means a guardrail changed the time (`iqama_clamped`). For one prayer on one day, with `current` = today's rules and `proposed` = the draft:
+
+- `changedDays`: the Iqama time differs between current and proposed (same count as `daysChanged`).
+- `movedNow`: moved today (`current.clamped`). `movedProposed`: moved under the proposal (`proposed.clamped`).
+- `newlyMoved`: moved under the proposal AND (not moved today, OR moved to a different time). A day that is already moved and stays exactly the same is NOT newly moved, so an untouched prayer reports 0 (for example Asr from 2027-02-11 to 2027-03-14).
+- `noLongerMoved`: moved today but not under the proposal.
+- `newlyMovedDates`: the first 10 dates (ascending) with a newly moved time.
+
+In `summary` (totals) each count is the number of days on which at least one prayer matches. The older fields (`daysChanged`, `daysClamped`, `daysClampedCurrent`, `firstChangedDates`, `firstClampedDates`, `byPrayer.*.daysChanged`, `byPrayer.*.daysClamped`) are unchanged. Use `newlyMoved` / `newlyMovedDates` for "this change causes new adjusted days" copy, not `daysClamped`.
 
 `requestHash` = SHA-256 of (canonical RuleSet + `|` + `effectiveFrom`). The token `previewId` is valid for 10 minutes, once, and only for that hash and that `currentRevision`.
 
