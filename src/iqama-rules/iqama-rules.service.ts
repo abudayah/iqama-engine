@@ -17,6 +17,7 @@ import {
   resolveRuleVersion,
 } from './iqama-rules.resolver';
 import { validateRuleSet } from './iqama-rules.validator';
+import { canonicalJson } from './iqama-rules.canonical';
 import { addDay, classifyDay, emptyStats } from './iqama-rules.preview-stats';
 import {
   IqamaRuleVersionRecord,
@@ -41,19 +42,7 @@ const addDays = (date: string, n: number): string => {
   return d.toISOString().slice(0, 10);
 };
 
-/** JSON with object keys sorted at every level (stable for hashing). */
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const o = value as Record<string, unknown>;
-    return `{${Object.keys(o)
-      .filter((k) => o[k] !== undefined)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
+export { canonicalJson };
 
 /** First Friday strictly after `today`. */
 export function nextFriday(today: string): string {
