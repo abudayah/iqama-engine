@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   INestApplication,
+  Logger,
   Module,
   UseGuards,
 } from '@nestjs/common';
@@ -202,6 +203,52 @@ describe('app setup: helmet, CORS, throttling', () => {
         await request(server).get('/api/v1/admin/a');
       }
       await request(server).get('/api/v1/schedule-test').expect(200);
+    });
+  });
+
+  describe('TRUST_PROXY startup warning', () => {
+    let warn: jest.SpyInstance;
+    beforeEach(() => {
+      warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    });
+    afterEach(() => warn.mockRestore());
+
+    it.each(['1', 'true'])('logs a warning for TRUST_PROXY=%s', async (v) => {
+      app = await makeApp({ TRUST_PROXY: v });
+      expect(warn).toHaveBeenCalledTimes(1);
+      const msg = String(warn.mock.calls[0][0]);
+      expect(msg).toContain('X-Forwarded-For');
+      expect(msg).toContain('loopback');
+      expect(msg).toContain('expressjs.com/en/guide/behind-proxies');
+    });
+
+    it.each(['loopback', '10.0.0.0/8,127.0.0.1', '', 'false'])(
+      'does not warn for TRUST_PROXY=%p',
+      async (v) => {
+        app = await makeApp({ TRUST_PROXY: v });
+        expect(warn).not.toHaveBeenCalled();
+      },
+    );
+
+    it('TRUST_PROXY=loopback still works: a direct (non-proxy) client cannot fake its IP', async () => {
+      app = await makeApp({ TRUST_PROXY: 'loopback' });
+      const server = app.getHttpServer();
+      // supertest connects from loopback, so loopback IS trusted here and the
+      // forwarded address is used; a different forwarded IP is a different client.
+      for (let i = 0; i < ADMIN_LIMIT_PER_MIN; i++) {
+        await request(server)
+          .get('/api/v1/admin/a')
+          .set('X-Forwarded-For', '203.0.113.7')
+          .expect(401);
+      }
+      await request(server)
+        .get('/api/v1/admin/a')
+        .set('X-Forwarded-For', '203.0.113.7')
+        .expect(429);
+      await request(server)
+        .get('/api/v1/admin/a')
+        .set('X-Forwarded-For', '203.0.113.8')
+        .expect(401);
     });
   });
 

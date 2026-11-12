@@ -1,7 +1,11 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
-import { parseTrustProxy } from './config/trust-proxy';
+import {
+  isUnsafeTrustProxy,
+  parseTrustProxy,
+  UNSAFE_TRUST_PROXY_WARNING,
+} from './config/trust-proxy';
 
 /**
  * HTTP-level setup shared by main.ts and the tests: proxy trust, security
@@ -10,7 +14,11 @@ import { parseTrustProxy } from './config/trust-proxy';
 export function configureApp(app: NestExpressApplication): void {
   // Behind a reverse proxy, req.ip (used by the rate limiter) is the proxy's
   // address unless trust proxy is set. Off by default: set TRUST_PROXY.
-  app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  if (isUnsafeTrustProxy(trustProxy)) {
+    new Logger('TrustProxy').warn(UNSAFE_TRUST_PROXY_WARNING);
+  }
+  app.set('trust proxy', trustProxy);
 
   // Security headers. This API serves JSON to other origins (display screens, the
   // admin UI), so Cross-Origin-Resource-Policy is relaxed; CORS itself is below.
