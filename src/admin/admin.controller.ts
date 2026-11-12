@@ -17,6 +17,7 @@ import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.ser
 import { CreateOverrideDto } from './dto/create-override.dto';
 import { UpdateOverrideDto } from './dto/update-override.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
+import { OverrideService } from '../override/override.service';
 
 @Controller('api/v1/admin')
 @UseGuards(ApiKeyGuard)
@@ -24,6 +25,7 @@ export class AdminController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scheduleBuilder: ScheduleBuilderService,
+    private readonly overrideService: OverrideService,
   ) {}
 
   /**
@@ -33,6 +35,12 @@ export class AdminController {
   @Post('overrides')
   @HttpCode(HttpStatus.CREATED)
   async createOverride(@Body() dto: CreateOverrideDto) {
+    // Same prayer may not have two active overrides covering the same day (409).
+    await this.overrideService.assertNoOverlap(
+      dto.prayer,
+      new Date(dto.startDate).toISOString().slice(0, 10),
+      new Date(dto.endDate).toISOString().slice(0, 10),
+    );
     const override = await this.prisma.override.create({
       data: {
         prayer: dto.prayer,
@@ -98,7 +106,17 @@ export class AdminController {
       throw new NotFoundException(`Override with ID ${id} not found`);
     }
 
-    // Update the override
+    // The edited override must not overlap another active one for the same prayer.
+    await this.overrideService.assertNoOverlap(
+      dto.prayer ?? existing.prayer,
+      dto.startDate
+        ? new Date(dto.startDate).toISOString().slice(0, 10)
+        : existing.startDate.toISOString().slice(0, 10),
+      dto.endDate
+        ? new Date(dto.endDate).toISOString().slice(0, 10)
+        : existing.endDate.toISOString().slice(0, 10),
+      id,
+    );
     const updated = await this.prisma.override.update({
       where: { id },
       data: {

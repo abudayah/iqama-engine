@@ -3,6 +3,13 @@ export interface PrayerEntry {
   iqama: string; // HH:mm
   /** True when a non-zero per-prayer Azan offset is applied (base or active period). */
   azan_customized?: boolean;
+  /** True when the guardrail raised/lowered the Iqama (min gap after Azan, or Fajr 60 min before sunrise). */
+  iqama_clamped?: boolean;
+  /**
+   * Fajr only: Azan + 3 min made it impossible to end 60 min before sunrise.
+   * The gap wins; this flags the day so it is never silent.
+   */
+  iqama_conflict?: boolean;
 }
 
 export interface DailySchedule {
@@ -10,6 +17,8 @@ export interface DailySchedule {
   hijri_date: string; // e.g., "Dhul Hijjah 25, 1446"
   day_of_week: string; // e.g. "Friday"
   is_dst: boolean;
+  /** Day-level flag: true when any prayer on this day has `iqama_conflict` (today only Fajr). */
+  iqama_conflict?: boolean;
   fajr: PrayerEntry;
   sunrise: string; // HH:mm
   dhuhr: PrayerEntry;

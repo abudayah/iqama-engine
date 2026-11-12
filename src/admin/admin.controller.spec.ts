@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleBuilderService } from '../schedule-builder/schedule-builder.service';
 import { CreateOverrideDto } from './dto/create-override.dto';
 import { UpdateOverrideDto } from './dto/update-override.dto';
 import { ApiKeyGuard } from '../auth/api-key.guard';
+import { OverrideService } from '../override/override.service';
 
 describe('AdminController', () => {
   let controller: AdminController;
@@ -46,6 +47,10 @@ describe('AdminController', () => {
       providers: [
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ScheduleBuilderService, useValue: mockScheduleBuilder },
+        {
+          provide: OverrideService,
+          useValue: { assertNoOverlap: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     })
       .overrideGuard(ApiKeyGuard)
@@ -254,5 +259,85 @@ describe('AdminController', () => {
         data: { deletedAt: expect.any(Date) },
       });
     });
+  });
+});
+
+describe('AdminController: same-prayer override overlap', () => {
+  const build = async (assertNoOverlap: jest.Mock) => {
+    const prisma = {
+      override: {
+        create: jest.fn().mockResolvedValue({ id: 9 }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 3,
+          prayer: 'fajr',
+          startDate: new Date('2027-06-01'),
+          endDate: new Date('2027-06-10'),
+          deletedAt: null,
+        }),
+        update: jest.fn().mockResolvedValue({ id: 3 }),
+      },
+    };
+    const module = await Test.createTestingModule({
+      controllers: [AdminController],
+      providers: [
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: ScheduleBuilderService,
+          useValue: { invalidateCache: jest.fn() },
+        },
+        { provide: OverrideService, useValue: { assertNoOverlap } },
+      ],
+    })
+      .overrideGuard(ApiKeyGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+    return { controller: module.get(AdminController), prisma };
+  };
+
+  const dto = {
+    prayer: 'fajr',
+    overrideType: 'FIXED',
+    value: '04:30',
+    startDate: '2027-06-05',
+    endDate: '2027-06-12',
+  } as CreateOverrideDto;
+
+  it('create checks the range and saves nothing on a clash (409)', async () => {
+    const clash = jest
+      .fn()
+      .mockRejectedValue(new ConflictException('Override #1 ...'));
+    const { controller, prisma } = await build(clash);
+    await expect(controller.createOverride(dto)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(clash).toHaveBeenCalledWith('fajr', '2027-06-05', '2027-06-12');
+    expect(prisma.override.create).not.toHaveBeenCalled();
+  });
+
+  it('create succeeds when nothing overlaps', async () => {
+    const { controller, prisma } = await build(
+      jest.fn().mockResolvedValue(undefined),
+    );
+    await controller.createOverride(dto);
+    expect(prisma.override.create).toHaveBeenCalled();
+  });
+
+  it('update checks the merged range and ignores itself', async () => {
+    const check = jest.fn().mockResolvedValue(undefined);
+    const { controller } = await build(check);
+    await controller.updateOverride(3, {
+      endDate: '2027-06-20',
+    });
+    expect(check).toHaveBeenCalledWith('fajr', '2027-06-01', '2027-06-20', 3);
+  });
+
+  it('update returns 409 and changes nothing on a clash', async () => {
+    const { controller, prisma } = await build(
+      jest.fn().mockRejectedValue(new ConflictException('Override #1 ...')),
+    );
+    await expect(
+      controller.updateOverride(3, { prayer: 'dhuhr' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.override.update).not.toHaveBeenCalled();
   });
 });

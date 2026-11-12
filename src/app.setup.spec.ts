@@ -15,6 +15,7 @@ import request from 'supertest';
 import { configureApp } from './app.setup';
 import { ApiKeyGuard } from './auth/api-key.guard';
 import { AdminController } from './admin/admin.controller';
+import { IqamaRulesController } from './iqama-rules/iqama-rules.controller';
 import { HijriCalendarController } from './hijri-calendar/hijri-calendar.controller';
 import { ScheduleController } from './schedule/schedule.controller';
 import {
@@ -71,6 +72,9 @@ async function makeApp(env: Record<string, string> = {}) {
   process.env = saved; // configureApp has read what it needs
   return app;
 }
+
+// Several tests send 100-300 real HTTP requests; the 5 s default can be too tight on a busy machine.
+jest.setTimeout(30_000);
 
 describe('app setup: helmet, CORS, throttling', () => {
   let app: INestApplication;
@@ -290,6 +294,12 @@ describe('isAdminRoute (real controllers)', () => {
   it('is true for every AdminController route', () => {
     expect(isAdminRoute(ctx(AdminController, 'listOverrides'))).toBe(true);
     expect(isAdminRoute(ctx(AdminController, 'clearAllOverrides'))).toBe(true);
+  });
+
+  it('is true for every IqamaRulesController route (admin limit applies)', () => {
+    for (const m of ['getConfig', 'getCatalog', 'preview', 'createVersion']) {
+      expect(isAdminRoute(ctx(IqamaRulesController, m))).toBe(true);
+    }
   });
 
   it('is true for method-level guards and false for public reads', () => {

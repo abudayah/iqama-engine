@@ -37,7 +37,7 @@ npx prisma generate
 echo "==> Running database migrations..."
 npx prisma migrate deploy
 
-echo "==> Seeding initial Adhan configuration (idempotent)..."
+echo "==> Seeding initial Adhan + Iqama rule configuration (idempotent)..."
 npx prisma db seed
 
 echo "==> Building application..."

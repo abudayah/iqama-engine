@@ -32,7 +32,7 @@ There are no user accounts, roles or sessions.
 
 - Administration uses **one shared admin key**. The caller sends it in the `x-api-key` header and the server compares it with the `ADMIN_PASSWORD` environment variable. The comparison hashes both values with SHA-256 and uses `timingSafeEqual` (`src/auth/api-key.guard.ts`).
 - If `ADMIN_PASSWORD` is not set on the server, every protected request is rejected with `401`.
-- Protected routes: everything under `/api/v1/admin/` (overrides, cache clear, Azan configuration), and in `/api/v1/hijri-calendar` the moon-sighting `POST`/`DELETE` `override` and `POST` `qiyam-config`.
+- Protected routes: everything under `/api/v1/admin/` (overrides, cache clear, Azan configuration, Iqama rules), and in `/api/v1/hijri-calendar` the moon-sighting `POST`/`DELETE` `override` and `POST` `qiyam-config`.
 - Public routes (no key): `GET /api/v1/schedule`, `GET /api/v1/health`, and `GET` `status`, `eid-prayers` and `qiyam-config` under `/api/v1/hijri-calendar`.
 - Because the key is shared, actions are not attributable to a person, and the key cannot be revoked per person. Rotating it means changing `ADMIN_PASSWORD` and restarting the service.
 - The key is sent in a request header, so the service must be served over HTTPS. The application itself does not terminate TLS.

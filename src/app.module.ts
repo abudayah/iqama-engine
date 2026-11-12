@@ -10,6 +10,7 @@ import { AdhanConfigModule } from './adhan-config/adhan-config.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { THROTTLER_OPTIONS } from './throttle/throttle.config';
+import { IqamaRulesModule } from './iqama-rules/iqama-rules.module';
 import { join } from 'path';
 
 @Module({
@@ -30,6 +31,7 @@ import { join } from 'path';
     HealthModule,
     HijriCalendarModule,
     AdhanConfigModule,
+    IqamaRulesModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

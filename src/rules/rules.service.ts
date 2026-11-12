@@ -7,6 +7,7 @@ import {
   WeeklyFajrEntry,
 } from './fajr.rule';
 import { computeDhuhrIqama } from './dhuhr.rule';
+import { parseCutover } from '../iqama-rules/iqama-rules.resolver';
 import { computeAsrIqama } from './asr.rule';
 import { computeMaghribIqama } from './maghrib.rule';
 import { computeIshaIqama, computeWeeklyIshaIqama } from './isha.rule';
@@ -26,14 +27,20 @@ export interface WeeklyContext {
   fajrWeek: WeeklyFajrEntry[];
   /** Isha Azan times for each day in the Friday→Thursday window. */
   ishaWeek: Dayjs[];
+  /** Full raw times for the same 7 days (used by the DB rule engine). */
+  rawWeek?: { date: string; raw: RawPrayerTimes }[];
 }
 
 @Injectable()
 export class RulesService {
   private readonly timezone: string;
+  private readonly cutover: string;
 
   constructor(private readonly configService: ConfigService) {
     this.timezone = this.configService.get<string>('app.masjidTimezone')!;
+    this.cutover = parseCutover(
+      this.configService.get('app.iqamaRulesCutover'),
+    );
   }
 
   /**
@@ -55,8 +62,8 @@ export class RulesService {
       ? computeWeeklyFajrIqama(weeklyCtx.fajrWeek)
       : computeFajrIqama(raw.fajr, raw.sunrise);
 
-    // Dhuhr: always use the requested date + timezone (DST toggle)
-    const dhuhr = computeDhuhrIqama(date, this.timezone);
+    // Dhuhr: fixed from the cutover date; historical DST rule before it
+    const dhuhr = computeDhuhrIqama(date, this.timezone, this.cutover);
 
     // Asr: use current day's times
     const asr = computeAsrIqama(raw.asr);

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { Dayjs } from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { IqamaTimes } from '../rules/rules.service';
@@ -7,6 +7,10 @@ import {
   formatHHmm,
   setTimeInTz,
 } from '../rules/time-utils';
+
+/** YYYY-MM-DD of a stored override boundary (Date from Prisma, or ISO string). */
+const ymd = (v: Date | string): string =>
+  (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
 
 export interface Override {
   id: number;
@@ -24,7 +28,14 @@ export interface Override {
 export class OverrideService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getOverridesForDate(date: string): Promise<Override[]> {
+  /**
+   * Overrides overlapping [startDate, endDate] (YYYY-MM-DD, inclusive),
+   * newest first. One query per month instead of one per day.
+   */
+  async getOverridesForRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<Override[]> {
     // SQLite stores DateTime as "YYYY-MM-DDTHH:mm:ss.sss+00:00".
     // Prisma serializes JS Date objects as "YYYY-MM-DD HH:mm:ss.sss" for SQLite
     // queries, which breaks lte/gte comparisons because space (ASCII 32) < 'T' (84),
@@ -32,9 +43,51 @@ export class OverrideService {
     // Fix: use raw SQL comparing the YYYY-MM-DD prefix, which is format-agnostic.
     return this.prisma.$queryRaw<Override[]>`
       SELECT * FROM "Override"
-      WHERE substr("startDate", 1, 10) <= ${date}
-        AND substr("endDate",   1, 10) >= ${date}
+      WHERE substr("startDate", 1, 10) <= ${endDate}
+        AND substr("endDate",   1, 10) >= ${startDate}
         AND "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
+    `;
+  }
+
+  /**
+   * Reject a new/changed override whose date range overlaps an active
+   * override for the SAME prayer (different prayers may overlap).
+   * Dates are YYYY-MM-DD, inclusive. `excludeId` skips the override being edited.
+   */
+  async assertNoOverlap(
+    prayer: string,
+    startDate: string,
+    endDate: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const clash = await this.findOverlaps(
+      prayer,
+      startDate,
+      endDate,
+      excludeId,
+    );
+    if (clash.length > 0) {
+      const c = clash[0];
+      throw new ConflictException(
+        `Override #${c.id} (${c.prayer} ${c.overrideType} ${c.value}, ${ymd(c.startDate)} to ${ymd(c.endDate)}) already covers ${prayer} within ${startDate} to ${endDate}. Edit or delete it first.`,
+      );
+    }
+  }
+
+  async findOverlaps(
+    prayer: string,
+    startDate: string,
+    endDate: string,
+    excludeId?: number,
+  ): Promise<Override[]> {
+    return this.prisma.$queryRaw<Override[]>`
+      SELECT * FROM "Override"
+      WHERE "prayer" = ${prayer}
+        AND substr("startDate", 1, 10) <= ${endDate}
+        AND substr("endDate",   1, 10) >= ${startDate}
+        AND "deletedAt" IS NULL
+        AND "id" != ${excludeId ?? -1}
       ORDER BY "createdAt" DESC
     `;
   }
@@ -45,7 +98,8 @@ export class OverrideService {
    * Priority rules enforced here:
    * - P0 (Admin Override): Highest priority — admin override value is used instead of the
    *   FR1–FR5 calculation. The admin is a trusted operator who knows the Shariah requirements.
-   *   No safety ceiling is applied; the override is used as-is (after P3 rounding).
+   *   The override is used as-is (after P3 rounding); the min-gap / Fajr-sunrise
+   *   guardrail is applied afterwards by ScheduleBuilderService (iqama_clamped).
    * - P3: All override results are rounded to the nearest 5 minutes (CeilingToNearest5).
    *
    * Override types:
@@ -62,7 +116,14 @@ export class OverrideService {
     const result = { ...rulesIqamaTimes };
     let hasOverrides = false;
 
-    for (const override of overrides) {
+    // Oldest first, so the NEWEST override for a prayer is applied last and wins.
+    const ordered = [...overrides].sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() ||
+        a.id - b.id,
+    );
+
+    for (const override of ordered) {
       const prayer = override.prayer as keyof IqamaTimes;
       // Skip overrides for unrecognised prayer names
       if (!(prayer in result)) continue;
